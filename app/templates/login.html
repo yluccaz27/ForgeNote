@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ForgeNote | Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <main class="login-page">
+    <section class="login-card">
+      <div class="brand">
+        <div class="brand-mark">F</div>
+        <div>
+          <h1>ForgeNote</h1>
+          <p>Organize personagens, ideias e histórias em um só lugar.</p>
+        </div>
+      </div>
+
+      <form class="login-form" method="POST">
+        <div class="form-group">
+          <label for="Usuario">Usuario</label>
+          <input
+            type="usuario"
+            id="usuario"
+            name="usuario"
+            placeholder="Usuario"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Senha</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="Digite sua senha"
+            required
+          />
+        </div>
+
+        <button type="submit" class="btn-login">Entrar</button>
+      </form>
+
+      <div class="login-footer">
+        <p>Não tem conta? <a href="#">Criar conta</a></p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

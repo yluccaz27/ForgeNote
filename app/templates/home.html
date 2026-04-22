@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>ForgeNote | Home</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+</head>
+<body>
+
+    <header class="topbar">
+        <div class="logo">
+            <span class="logo-mark">F</span>
+            <h1>ForgeNote</h1>
+        </div>
+
+        <div class="user-info">
+            <span>Olá, {{user}}</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="welcome">
+            <h2>Bem-vindo de volta 👋</h2>
+            <p>Continue organizando suas ideias, personagens e histórias.</p>
+        </section>
+
+        <section class="cards">
+            <div class="card">
+                <h3>📖 Histórias</h3>
+                <p>Gerencie suas narrativas.</p>
+            </div>
+
+            <div class="card">
+                <h3>🧍 Personagens</h3>
+                <p>Crie e organize seus personagens.</p>
+            </div>
+
+            <div class="card">
+                <h3>💡 Ideias</h3>
+                <p>Salve suas ideias rápidas.</p>
+            </div>
+        </section>
+    </main>
+
+</body>
+</html>
