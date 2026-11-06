@@ -1,0 +1,7 @@
+# Trecho relevante para o Supabase CLI (supabase start / link).
+# No projeto hospedado, faça o mesmo pelo painel: Authentication > Sign In / Providers.
+[auth]
+enable_signup = false
+
+[auth.email]
+enable_signup = false

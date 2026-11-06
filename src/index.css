@@ -1,0 +1,161 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ardosia: #22272B;
+  --ardosia-alta: #2F363B;
+  --osso: #DAD5C8;
+  --liquen: #8D978B;
+  --lacre: #B23A44;
+  --borda: rgb(141 151 139 / 0.35);
+  color-scheme: dark;
+}
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-ardosia text-osso font-ui text-ui antialiased;
+    margin: 0;
+  }
+  /* foco do teclado sempre visível: anel 2px lacre, offset 2px */
+  :focus-visible { outline: 2px solid var(--lacre); outline-offset: 2px; }
+  :focus:not(:focus-visible) { outline: none; }
+  ::selection { background: rgb(178 58 68 / 0.45); color: var(--osso); }
+  input, textarea, select, button { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: default; opacity: .55; }
+}
+
+@layer components {
+  /* texto secundário: líquen sobre ardósia; nas superfícies elevadas o líquen
+     cai para ~4:1, então usamos osso a 70% (≈5:1) para manter AA */
+  .meta { color: var(--liquen); }
+  .elev { background: var(--ardosia-alta); }
+  .elev .meta { color: rgb(218 213 200 / 0.7); }
+
+  .borda { border: 1px solid var(--borda); }
+  .borda-b { border-bottom: 1px solid var(--borda); }
+  .borda-t { border-top: 1px solid var(--borda); }
+  .borda-r { border-right: 1px solid var(--borda); }
+  .borda-l { border-left: 1px solid var(--borda); }
+
+  .btn {
+    @apply inline-flex items-center gap-2 rounded-campo px-3 min-h-alvo text-ui;
+    background: transparent;
+    border: 1px solid var(--borda);
+  }
+  .btn:hover:not(:disabled) { background: var(--ardosia-alta); }
+  .elev .btn:hover:not(:disabled) { background: var(--ardosia); }
+  .btn-primario {
+    @apply inline-flex items-center gap-2 rounded-campo px-4 min-h-alvo text-ui font-semibold bg-lacre text-osso;
+    border: 1px solid var(--lacre);
+  }
+  .btn-fantasma {
+    @apply inline-flex items-center gap-2 rounded-campo px-2 min-h-alvo text-ui;
+    background: transparent; border: 1px solid transparent;
+  }
+  .btn-fantasma:hover:not(:disabled) { border-color: var(--borda); }
+  .btn-icone {
+    @apply inline-flex items-center justify-center rounded-campo min-h-alvo;
+    width: 32px; background: transparent; border: 1px solid transparent;
+  }
+  .btn-icone:hover:not(:disabled) { border-color: var(--borda); }
+
+  .campo {
+    @apply rounded-campo px-2 min-h-alvo text-ui w-full;
+    background: var(--ardosia);
+    border: 1px solid var(--borda);
+  }
+  .elev .campo { background: var(--ardosia); }
+  .campo:focus-visible { outline-offset: 0; }
+  .campo::placeholder { color: var(--liquen); }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-chip px-2 text-ui-sm;
+    min-height: 24px;
+    background: var(--ardosia-alta);
+    border: 1px solid var(--borda);
+  }
+  .elev .chip { background: var(--ardosia); }
+
+  /* papel: claro sobre a mesa, canto de papel, faixa de marcação de 3px */
+  .papel {
+    @apply rounded-papel bg-osso text-ardosia;
+    border-left: 3px solid var(--marca, var(--liquen));
+  }
+  .papel-provisorio {
+    background: rgb(218 213 200 / 0.55);
+    border: 1px dashed var(--ardosia);
+    border-left: 3px dashed var(--marca, var(--liquen));
+  }
+  .papel-provisorio .titulo-papel { font-style: italic; }
+  .papel-levantado { box-shadow: 0 6px 14px rgba(0,0,0,.35); }
+
+  .mesa-pontos {
+    background-color: var(--ardosia);
+    background-image: radial-gradient(rgb(141 151 139 / 0.15) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .aba { @apply px-3 min-h-alvo text-ui-lg inline-flex items-center rounded-campo; border: 1px solid transparent; }
+  .aba[aria-selected="true"] { border-color: var(--borda); background: var(--ardosia-alta); }
+  .item-ativo { box-shadow: inset 2px 0 0 var(--lacre); }
+}
+
+/* ───────── Notepad (TipTap) ───────── */
+.notepad .ProseMirror {
+  @apply font-texto text-texto text-osso max-w-medida;
+  outline: none;
+  min-height: 240px;
+  text-align: left;
+}
+.notepad .ProseMirror p { margin: 0 0 12px; }
+.notepad .ProseMirror h2 { @apply font-texto text-ui-lg font-semibold; margin: 24px 0 8px; }
+.notepad .ProseMirror blockquote { border-left: 2px solid var(--borda); padding-left: 16px; margin: 0 0 12px; color: var(--liquen); }
+.notepad .ProseMirror ul, .notepad .ProseMirror ol { padding-left: 24px; margin: 0 0 12px; }
+.notepad .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--liquen);
+  float: left; height: 0; pointer-events: none;
+}
+.mencao { color: var(--osso); text-decoration: underline; text-decoration-color: var(--lacre); text-underline-offset: 3px; cursor: pointer; }
+.mencao-quebrada { text-decoration-style: dashed; text-decoration-color: var(--liquen); }
+.notepad-compacto .ProseMirror { min-height: 96px; }
+
+/* ───────── Quadro (React Flow) ───────── */
+.react-flow { --xy-background-color: transparent; }
+.react-flow__node { font-family: inherit; }
+.react-flow__node:focus-visible { outline: none; }
+.react-flow__node:focus-visible .papel { outline: 2px solid var(--lacre); outline-offset: 2px; }
+.react-flow__handle {
+  width: 10px; height: 10px; border-radius: 999px;
+  background: var(--ardosia); border: 2px solid var(--lacre);
+  opacity: 0;
+}
+.react-flow__node:hover .react-flow__handle, .react-flow__node.selected .react-flow__handle { opacity: 1; }
+.react-flow__edge-textbg { fill: var(--ardosia); }
+.react-flow__connection-path { stroke: var(--lacre); stroke-width: 2; }
+.react-flow__controls { box-shadow: none; }
+.react-flow__controls-button {
+  background: var(--ardosia-alta); border: 1px solid var(--borda); color: var(--osso); width: 32px; height: 32px;
+}
+.react-flow__controls-button svg { fill: var(--osso); }
+.react-flow__attribution { display: none; }
+.react-flow__minimap { background: var(--ardosia-alta); border-radius: 8px; }
+
+/* fio sendo desenhado: o momento memorável */
+@keyframes desenhar-fio { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
+.fio-novo { stroke-dasharray: var(--len); animation: desenhar-fio 350ms ease-out both; }
+
+.foco-esmaecido { opacity: .25; }
+
+/* ───────── Timeline ───────── */
+.evento-corpo { transition: height 180ms ease-out; overflow: hidden; }
+.painel-desliza { animation: painel-entra 160ms ease-out both; }
+@keyframes painel-entra { from { transform: translateX(24px); } to { transform: translateX(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0ms !important; transition-duration: 0ms !important; }
+  .fio-novo { animation: none; stroke-dasharray: none; }
+}
