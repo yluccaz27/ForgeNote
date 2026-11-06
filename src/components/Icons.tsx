@@ -57,3 +57,19 @@ export const IconOlho = (p: SVGProps<SVGSVGElement>) => (
 export const IconArrastar = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><circle cx="9" cy="6" r=".8" /><circle cx="15" cy="6" r=".8" /><circle cx="9" cy="12" r=".8" /><circle cx="15" cy="12" r=".8" /><circle cx="9" cy="18" r=".8" /><circle cx="15" cy="18" r=".8" /></svg>
 )
+export const IconMaisOpcoes = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><circle cx="5" cy="12" r="1.2" fill="currentColor" /><circle cx="12" cy="12" r="1.2" fill="currentColor" /><circle cx="19" cy="12" r="1.2" fill="currentColor" /></svg>
+)
+export const IconTeclado = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><rect x="2.5" y="6" width="19" height="12" rx="1.5" /><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6" /></svg>
+)
+/** título ligado ao campo Nome */
+export const IconLink = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg>
+)
+export const IconLinkQuebrado = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M15.7 14 18.7 11a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M8.3 10 5.3 13a4 4 0 0 0 5.7 5.7l1-1" /><path d="M4 4l3 3M20 20l-3-3" /></svg>
+)
+export const IconInfo = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.5" /></svg>
+)

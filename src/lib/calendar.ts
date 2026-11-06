@@ -72,7 +72,7 @@ export function formatarAno(c: CalendarioConfig, anoAbs: number) {
   return era ? `${ano} ${era.sigla}` : String(ano)
 }
 
-/** "12 de Brumar, 340 E.S." */
+/** "12 de Bruma, 340 E.P." */
 export function formatarDia(c: CalendarioConfig, abs: number) {
   const p = partesDeDia(c, abs)
   const mes = c.meses[p.mes]?.nome ?? ''

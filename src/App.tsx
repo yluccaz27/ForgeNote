@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { localBackend, setCurrentUser, supabase, supabaseBackend, supabaseConfigured } from './lib/backend'
-import { cache, ensure, invalidarTabela, setBackend } from './lib/data'
+import { cache, ensure, invalidarTabela, limparLixeira, setBackend } from './lib/data'
 import { TABLES } from './lib/types'
 import { useUI } from './store/ui'
 import { Login } from './components/Login'
@@ -19,6 +19,7 @@ type Estado = 'carregando' | 'login' | 'sem-workspace' | 'pronto'
 
 async function carregarTudo() {
   await Promise.all(TABLES.map((t) => ensure(t)))
+  limparLixeira()
   const wss = cache('workspaces')
   const ui = useUI.getState()
   if (!wss.length) return false

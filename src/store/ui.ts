@@ -29,6 +29,8 @@ interface UI {
   /** personagem destacado na timeline */
   destaque: string | null
   setDestaque: (id: string | null) => void
+  atalhosAberto: boolean
+  setAtalhos: (v: boolean) => void
 }
 
 let seq = 0
@@ -39,7 +41,8 @@ export const useUI = create<UI>((set, get) => ({
   toast: (t) => {
     const id = ++seq
     set({ toasts: [...get().toasts.slice(-2), { ...t, id }] })
-    setTimeout(() => get().fecharToast(id), t.erro ? 9000 : 5000)
+    // com Desfazer: 8s para dar tempo de reagir
+    setTimeout(() => get().fecharToast(id), t.erro ? 9000 : t.acao ? 8000 : 5000)
   },
   fecharToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
   buscaAberta: false,
@@ -51,7 +54,11 @@ export const useUI = create<UI>((set, get) => ({
   setPainelNote: (id) => set({ painelNote: id }),
   destaque: null,
   setDestaque: (id) => set({ destaque: id }),
+  atalhosAberto: false,
+  setAtalhos: (v) => set({ atalhosAberto: v }),
 }))
 
 export const toast = (texto: string, acao?: Toast['acao']) => useUI.getState().toast({ texto, acao })
+/** Toast "X excluído. Desfazer" (8s). */
+export const toastDesfazer = (texto: string, desfazer: () => void) => toast(texto, { rotulo: 'Desfazer', fn: desfazer })
 export const toastErro = (texto: string) => useUI.getState().toast({ texto, erro: true })

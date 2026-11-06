@@ -63,7 +63,7 @@ export function Notepad({ noteId, compacto = false, placeholder }: { noteId: str
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [2] }, codeBlock: false, code: false }),
-      Placeholder.configure({ placeholder: placeholder ?? 'Escreva o backstory. Use [[Nome]] para citar outro note.' }),
+      Placeholder.configure({ placeholder: placeholder ?? 'Escreva livremente: passado, motivações, segredos…' }),
       Mencoes.configure({
         existe: (nome) => { const ws = useUI.getState().wsId; return !!ws && !!noteParaNome(ws, nome) },
         abrir: (nome) => {
@@ -76,7 +76,7 @@ export function Notepad({ noteId, compacto = false, placeholder }: { noteId: str
       }),
     ],
     content: (note?.corpo_json as object) ?? '',
-    editorProps: { attributes: { 'aria-label': 'Notepad', spellcheck: 'true' } },
+    editorProps: { attributes: { 'aria-label': 'História', spellcheck: 'true' } },
     onUpdate: ({ editor }) => {
       pendente.current = editor.getJSON()
       clearTimeout(timer.current)

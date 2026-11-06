@@ -29,7 +29,7 @@ export function BuscaModal() {
       <ul className="flex flex-col gap-1" role="listbox" aria-label="Resultados">
         {res.map((r, idx) => (
           <li key={r.note.id} role="option" aria-selected={idx === i}>
-            <button className={`w-full text-left px-3 py-2 rounded-campo ${idx === i ? 'bg-ardosia item-ativo' : ''}`}
+            <button className={`w-full text-left px-3 py-2 rounded-campo ${idx === i ? 'bg-mesa item-ativo' : ''}`}
               onMouseEnter={() => setI(idx)} onClick={() => abrir(r.note.id)}>
               <span className="flex items-center gap-2">
                 <span aria-hidden style={{ width: 3, height: 16, background: corMarcacao(r.note.predefinicao_id) }} />

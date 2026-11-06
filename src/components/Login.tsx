@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase, supabaseConfigured } from '../lib/backend'
+import { IconErro } from './Icons'
 
 export function Login({ onEntrou, onLocal, erro: erroInicial }: {
   onEntrou: (userId: string, email: string | null) => void
@@ -30,8 +31,8 @@ export function Login({ onEntrou, onLocal, erro: erroInicial }: {
     <main className="h-full flex items-center justify-center p-4">
       <div className="w-full" style={{ maxWidth: 360 }}>
         <svg width="40" height="40" viewBox="0 0 32 32" aria-hidden className="mb-6">
-          <rect x="7" y="6" width="18" height="20" rx="1" fill="var(--osso)" />
-          <path d="M2 23 C 11 16, 20 27, 30 13" stroke="var(--lacre)" strokeWidth="2.2" fill="none" />
+          <rect x="7" y="6" width="18" height="20" rx="1" fill="var(--papel)" />
+          <path d="M2 23 C 11 16, 20 27, 30 13" stroke="var(--verdete)" strokeWidth="2.2" fill="none" />
         </svg>
         <h1 className="font-texto text-titulo-note mb-2">ForgeNote</h1>
         <p className="meta mb-8">A mesa onde o mundo fica guardado.</p>
@@ -46,14 +47,14 @@ export function Login({ onEntrou, onLocal, erro: erroInicial }: {
               <span>Senha</span>
               <input className="campo" type="password" autoComplete="current-password" required value={senha} onChange={(e) => setSenha(e.target.value)} />
             </label>
-            {erro && <p role="alert" className="text-ui" style={{ color: 'var(--osso)' }}><span className="text-lacre">●</span> {erro}</p>}
+            {erro && <p role="alert" className="borda rounded-campo px-3 py-2 flex items-start gap-2"><IconErro width={18} height={18} className="shrink-0" /> {erro}</p>}
             <button className="btn-primario justify-center" disabled={enviando}>{enviando ? 'Entrando…' : 'Entrar'}</button>
             <p className="meta text-ui-sm">O cadastro é fechado. Peça um convite para quem administra o workspace.</p>
           </form>
         ) : (
           <div className="flex flex-col gap-4">
             <p>O Supabase ainda não foi configurado neste build. Você pode testar tudo no modo local: os dados ficam só neste navegador.</p>
-            {erro && <p role="alert"><span className="text-lacre">●</span> {erro}</p>}
+            {erro && <p role="alert" className="borda rounded-campo px-3 py-2 flex items-start gap-2"><IconErro width={18} height={18} className="shrink-0" /> {erro}</p>}
             <button className="btn-primario justify-center" onClick={onLocal}>Entrar no modo local</button>
             <p className="meta text-ui-sm">Para usar com login de verdade, defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY. O README explica.</p>
           </div>

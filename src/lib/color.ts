@@ -1,15 +1,16 @@
 /**
- * Cor de marcação por predefinição: paleta secundária dessaturada,
- * mesma luminosidade (L 60% em OKLCH), para nunca competir com o lacre.
- * Matizes perto do vermelho do lacre (~20°) são evitados.
+ * Cor de marcação por predefinição: paleta secundária dessaturada com
+ * luminosidade fixa (OKLCH L 0,68, C 0,06), em faixa de 3px no papel.
+ * Evita os matizes do verdete (~180°), do latão (~80°) e do perigo (~35°),
+ * para a marcação nunca se confundir com acento, metal ou exclusão.
  */
-const MATIZES = [75, 110, 150, 190, 230, 265, 300, 340]
+const MATIZES = [110, 135, 230, 255, 280, 305, 330]
 
 export function corMarcacao(chave: string | null | undefined): string {
-  if (!chave) return 'oklch(60% 0 0)'
+  if (!chave) return 'oklch(68% 0 0)'
   let h = 0
   for (const c of chave) h = (h * 31 + c.charCodeAt(0)) >>> 0
-  return `oklch(60% 0.07 ${MATIZES[h % MATIZES.length]})`
+  return `oklch(68% 0.06 ${MATIZES[h % MATIZES.length]})`
 }
 
 /** Cor de trilha livre (mesma família). */

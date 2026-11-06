@@ -7,7 +7,7 @@ ForgeNote parte de uma ideia simples: **cada coisa existe uma vez só**. Um pers
 ## Recursos
 
 **Note**
-Ficha com abas e campos configuráveis (texto, número, data, seleção, relação e imagem), além de um editor de texto livre. Fichas podem virar predefinições reutilizáveis.
+Tela em três blocos: Identificação (título, tipo e onde o note fica guardado), Ficha (seções com campos de texto, número, data, seleção, relação e imagem) e História (texto livre). Fichas podem virar predefinições reutilizáveis.
 
 **Gaveteiro**
 Projetos organizados em gaveteiros e pastas. Um note pode estar em várias pastas ao mesmo tempo, e pastas podem se organizar sozinhas a partir dos campos da ficha.
@@ -17,6 +17,8 @@ Canvas livre onde os notes viram cartões e as relações viram linhas. As conex
 
 **Timeline**
 Linha do tempo com calendário próprio (eras, meses e dias customizáveis), zoom, trilhas e eventos que expandem para edição e recolhem para leitura.
+
+Tudo o que se cria pode ser excluído, com confirmação e Desfazer. Itens excluídos ficam 30 dias na lixeira antes de sumir de vez. Pressione `?` no app para ver os atalhos de teclado.
 
 ## Stack
 
@@ -72,6 +74,8 @@ src/
   lib/         dados, regras de domínio e calendário
 supabase/      migrations do banco
 ```
+
+As migrations ficam em `supabase/migrations` e rodam em ordem. Nenhuma delas insere dados.
 
 ## Segurança
 

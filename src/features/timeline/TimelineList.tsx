@@ -6,7 +6,9 @@ import { toast, useUI } from '../../store/ui'
 import { Modal } from '../../components/Modal'
 import { IconMais } from '../../components/Icons'
 import { CalendarioModal } from './CalendarioModal'
-import type { Calendario } from '../../lib/types'
+import { MenuMais } from '../../components/Menu'
+import { ExcluirCalendarioDialogo, ExcluirTimelineDialogo } from './Excluir'
+import type { Calendario, Timeline } from '../../lib/types'
 
 export function TimelineList() {
   const tls = useWsTable('timelines')
@@ -17,6 +19,8 @@ export function TimelineList() {
   const [nome, setNome] = useState('')
   const [calId, setCalId] = useState<string>('')
   const [editCal, setEditCal] = useState<Calendario | null>(null)
+  const [exCal, setExCal] = useState<Calendario | null>(null)
+  const [exTl, setExTl] = useState<Timeline | null>(null)
 
   /** cria um calendário-base e abre o editor para o usuário dar nomes às eras e meses */
   function criarCalendario() {
@@ -54,7 +58,12 @@ export function TimelineList() {
         </div>
       )}
       <ul className="flex flex-col gap-2 mb-8" style={{ maxWidth: 640 }}>
-        {tls.map((t) => <li key={t.id}><Link to={`/timeline/${t.id}`} className="btn w-full justify-start">{t.nome}</Link></li>)}
+        {tls.map((t) => (
+          <li key={t.id} className="flex items-center gap-1">
+            <Link to={`/timeline/${t.id}`} className="btn flex-1 justify-start valor">{t.nome}</Link>
+            <MenuMais rotulo={`Opções da timeline ${t.nome}`} itens={[{ rotulo: 'Abrir timeline', onClick: () => nav(`/timeline/${t.id}`) }]} excluir={() => setExTl(t)} />
+          </li>
+        ))}
       </ul>
       {tls.length === 0 && cals.length > 0 && <p className="mb-8">Uma timeline organiza os eventos do mundo em trilhas, no calendário que você inventar.</p>}
 
@@ -62,12 +71,15 @@ export function TimelineList() {
       <ul className="flex flex-col gap-2" style={{ maxWidth: 640 }}>
         {cals.map((c) => (
           <li key={c.id} className="flex items-center gap-3">
-            <span className="flex-1">{c.nome} <span className="meta text-ui-sm">{c.config_json.meses.length} meses, {c.config_json.eras.map((e) => e.sigla).join(', ')}</span></span>
+            <span className="flex-1"><span className="valor">{c.nome}</span> <span className="meta text-ui-sm">{c.config_json.meses.length} meses, {c.config_json.eras.map((e) => e.sigla).join(', ')}</span></span>
             <button className="btn" onClick={() => setEditCal(c)}>Editar calendário</button>
+            <MenuMais rotulo={`Opções do calendário ${c.nome}`} excluir={() => setExCal(c)} />
           </li>
         ))}
-        {cals.length > 0 && <li><button className="btn" onClick={criarCalendario}>Novo calendário</button></li>}
+        {cals.length > 0 && <li><button className="btn" onClick={criarCalendario}><IconMais width={16} height={16} /> Novo calendário</button></li>}
       </ul>
+      {exCal && <ExcluirCalendarioDialogo cal={exCal} onFechar={() => setExCal(null)} />}
+      {exTl && <ExcluirTimelineDialogo tl={exTl} onFechar={() => setExTl(null)} />}
 
       {nova && (
         <Modal titulo="Nova timeline" onFechar={() => setNova(false)}>

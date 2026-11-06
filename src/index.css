@@ -2,37 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ───────── Gabinete do arquivista ─────────
+   Mesa de ardósia, fichas de papel, latão nas ferragens e fio de cobre
+   oxidado (verdete) como único acento. Perigo só no botão final de exclusão. */
 :root {
-  --ardosia: #22272B;
-  --ardosia-alta: #2F363B;
-  --osso: #DAD5C8;
-  --liquen: #8D978B;
-  --lacre: #B23A44;
-  --borda: rgb(141 151 139 / 0.35);
+  --mesa: #1E2326;
+  --mesa-alta: #2A3135;
+  --papel: #E4DCCB;
+  --tinta: #262A2C;
+  --liquen: #97A195;
+  --verdete: #66AE9F;
+  --verdete-tinta: #2F6B5F;
+  --latao: #BC995F;
+  --perigo: #DE7660;
+  --borda: rgb(151 161 149 / 0.35);
+  --borda-forte: rgb(151 161 149 / 0.6);
+  /* granulado da ardósia: ruído branco a ~3% */
+  --grao: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 .055 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  /* fibra do papel: riscos horizontais muito leves em tinta */
+  --fibra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .15 0 0 0 0 .16 0 0 0 0 .17 .09 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
   color-scheme: dark;
 }
 
 @layer base {
   html, body, #root { height: 100%; }
   body {
-    @apply bg-ardosia text-osso font-ui text-ui antialiased;
+    @apply text-papel font-ui text-ui antialiased;
+    background-color: var(--mesa);
+    background-image: var(--grao);
     margin: 0;
   }
-  /* foco do teclado sempre visível: anel 2px lacre, offset 2px */
-  :focus-visible { outline: 2px solid var(--lacre); outline-offset: 2px; }
+  /* foco do teclado sempre visível: anel verdete 2px */
+  :focus-visible { outline: 2px solid var(--verdete); outline-offset: 2px; }
   :focus:not(:focus-visible) { outline: none; }
-  ::selection { background: rgb(178 58 68 / 0.45); color: var(--osso); }
+  ::selection { background: rgb(102 174 159 / 0.4); color: var(--papel); }
   input, textarea, select, button { font: inherit; color: inherit; }
   button { cursor: pointer; }
   button:disabled { cursor: default; opacity: .55; }
 }
 
 @layer components {
-  /* texto secundário: líquen sobre ardósia; nas superfícies elevadas o líquen
-     cai para ~4:1, então usamos osso a 70% (≈5:1) para manter AA */
   .meta { color: var(--liquen); }
-  .elev { background: var(--ardosia-alta); }
-  .elev .meta { color: rgb(218 213 200 / 0.7); }
+  .elev { background-color: var(--mesa-alta); }
 
   .borda { border: 1px solid var(--borda); }
   .borda-b { border-bottom: 1px solid var(--borda); }
@@ -40,72 +51,175 @@
   .borda-r { border-right: 1px solid var(--borda); }
   .borda-l { border-left: 1px solid var(--borda); }
 
+  /* ───────── botões ───────── */
   .btn {
-    @apply inline-flex items-center gap-2 rounded-campo px-3 min-h-alvo text-ui;
+    @apply inline-flex items-center gap-2 rounded-campo px-3 min-h-alvo text-ui text-papel;
     background: transparent;
-    border: 1px solid var(--borda);
+    border: 1px solid var(--borda-forte);
   }
-  .btn:hover:not(:disabled) { background: var(--ardosia-alta); }
-  .elev .btn:hover:not(:disabled) { background: var(--ardosia); }
+  .btn:hover:not(:disabled) { background: var(--mesa-alta); }
+  .elev .btn:hover:not(:disabled) { background: var(--mesa); }
   .btn-primario {
-    @apply inline-flex items-center gap-2 rounded-campo px-4 min-h-alvo text-ui font-semibold bg-lacre text-osso;
-    border: 1px solid var(--lacre);
+    @apply inline-flex items-center gap-2 rounded-campo px-4 min-h-alvo text-ui font-semibold text-mesa;
+    background: var(--verdete);
+    border: 1px solid var(--verdete);
   }
+  .btn-primario:hover:not(:disabled) { background: #77BCAE; }
   .btn-fantasma {
-    @apply inline-flex items-center gap-2 rounded-campo px-2 min-h-alvo text-ui;
+    @apply inline-flex items-center gap-2 rounded-campo px-2 min-h-alvo text-ui text-papel;
     background: transparent; border: 1px solid transparent;
+    text-underline-offset: 3px;
   }
-  .btn-fantasma:hover:not(:disabled) { border-color: var(--borda); }
+  .btn-fantasma:hover:not(:disabled) { text-decoration: underline; }
+  .btn-fantasma.meta { color: var(--liquen); }
+  /* o único lugar do app com a cor perigo: o botão final do diálogo de exclusão */
+  .btn-perigo {
+    @apply inline-flex items-center gap-2 rounded-campo px-4 min-h-alvo text-ui font-semibold text-mesa;
+    background: var(--perigo);
+    border: 1px solid var(--perigo);
+  }
   .btn-icone {
     @apply inline-flex items-center justify-center rounded-campo min-h-alvo;
     width: 32px; background: transparent; border: 1px solid transparent;
   }
   .btn-icone:hover:not(:disabled) { border-color: var(--borda); }
 
+  /* ───────── campos ───────── */
   .campo {
     @apply rounded-campo px-2 min-h-alvo text-ui w-full;
-    background: var(--ardosia);
+    background: var(--mesa);
     border: 1px solid var(--borda);
   }
-  .elev .campo { background: var(--ardosia); }
   .campo:focus-visible { outline-offset: 0; }
-  .campo::placeholder { color: var(--liquen); }
+  .campo::placeholder { color: var(--liquen); font-family: theme('fontFamily.ui'); }
+  .campo-vazio { border-style: dashed; color: var(--liquen); }
+  /* o app pergunta (sans, líquen), o usuário responde (Literata, papel) */
+  .rotulo { @apply font-ui text-ui-sm font-medium; color: var(--liquen); }
+  .valor { @apply font-texto text-ui; }
 
   .chip {
     @apply inline-flex items-center gap-1 rounded-chip px-2 text-ui-sm;
     min-height: 24px;
-    background: var(--ardosia-alta);
+    background: var(--mesa-alta);
     border: 1px solid var(--borda);
   }
-  .elev .chip { background: var(--ardosia); }
+  .elev .chip { background: var(--mesa); }
+  .chip-tracejado { border-style: dashed; color: var(--liquen); background: transparent !important; }
 
-  /* papel: claro sobre a mesa, canto de papel, faixa de marcação de 3px */
-  .papel {
-    @apply rounded-papel bg-osso text-ardosia;
-    border-left: 3px solid var(--marca, var(--liquen));
+  /* ───────── blocos da tela Note ───────── */
+  .num-bloco {
+    @apply font-texto text-ui-lg font-medium;
+    font-variant-numeric: oldstyle-nums;
+    color: var(--latao);
+    width: 20px;
   }
+
+  /* ───────── papel: ficha com fibra, borda irregular, faixa de 3px ───────── */
+  .papel-moldura { position: relative; }
+  .papel {
+    @apply rounded-papel text-tinta;
+    background-color: var(--papel);
+    background-image: var(--fibra);
+    border-left: 3px solid var(--marca, var(--liquen));
+    clip-path: polygon(0 1px, 18% 0, 47% 1px, 81% 0, 100% 1px, 100% calc(100% - 1px), 64% 100%, 0 calc(100% - 1px));
+  }
+  .papel a, .papel .link { color: var(--verdete-tinta); }
   .papel-provisorio {
-    background: rgb(218 213 200 / 0.55);
-    border: 1px dashed var(--ardosia);
+    background-color: rgb(228 220 203 / 0.6);
+    outline: 1px dashed var(--tinta);
+    outline-offset: -2px;
     border-left: 3px dashed var(--marca, var(--liquen));
   }
   .papel-provisorio .titulo-papel { font-style: italic; }
-  .papel-levantado { box-shadow: 0 6px 14px rgba(0,0,0,.35); }
+  /* a sombra fica na moldura: o clip-path do papel cortaria um box-shadow */
+  .papel-levantado { filter: drop-shadow(0 6px 8px rgba(0,0,0,.5)); }
 
-  .mesa-pontos {
-    background-color: var(--ardosia);
-    background-image: radial-gradient(rgb(141 151 139 / 0.15) 1px, transparent 1px);
-    background-size: 24px 24px;
+  /* tacha de latão no topo do papel do quadro */
+  .tacha {
+    position: absolute; top: -4px; left: 50%; width: 10px; height: 10px; z-index: 1;
+    transform: translateX(-50%); border-radius: 999px;
+    background: var(--latao); box-shadow: inset 0 0 0 1px rgb(38 42 44 / 0.45);
+    transition: transform 120ms ease-out, opacity 120ms ease-out;
+    pointer-events: none;
+  }
+  .papel-levantado .tacha { transform: translate(-50%, -8px); opacity: 0; }
+
+  .mesa-quadro {
+    background-color: var(--mesa);
+    background-image: var(--grao);
   }
 
+  /* ───────── gaveteiro: frente de gaveta de fichário ───────── */
+  .gaveta {
+    @apply rounded-painel flex flex-col items-center gap-3 px-4;
+    padding-top: 44px; padding-bottom: 20px;
+    background-color: var(--frente, var(--mesa-alta));
+    background-image: var(--grao);
+    border: 1px solid var(--borda);
+    transition: transform 160ms ease-out;
+  }
+  .gaveta-abrindo { transform: translateY(8px); }
+  .porta-etiqueta {
+    @apply w-full flex items-center justify-center px-2 py-2;
+    border: 1.5px solid var(--latao);
+    border-radius: 2px;
+    min-height: 64px;
+  }
+  .etiqueta-papel { @apply rounded-papel w-full px-2 py-1 text-tinta text-center; background-color: var(--papel); background-image: var(--fibra); }
+  .puxador { width: 44px; height: 12px; border: 1.5px solid var(--latao); border-top: 0; border-radius: 0 0 10px 10px; }
+
+  /* guias de pasta: abas de fichário com chanfro de 6px */
+  .guia {
+    @apply text-left px-2 min-h-alvo flex items-center gap-2;
+    border-radius: 2px 0 0 2px;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%);
+  }
+  .guia[aria-current="true"] { background: var(--mesa); box-shadow: inset 2px 0 0 var(--verdete); }
+
+  /* carimbo de data na timeline */
+  .carimbo {
+    @apply text-ui-sm whitespace-nowrap px-1;
+    color: var(--latao);
+    background: var(--mesa);
+    border: 3px double var(--latao);
+    border-radius: 2px;
+    transform: rotate(var(--giro, 0deg));
+    line-height: 1.2;
+  }
+
+  /* ───────── navegação ───────── */
   .aba { @apply px-3 min-h-alvo text-ui-lg inline-flex items-center rounded-campo; border: 1px solid transparent; }
-  .aba[aria-selected="true"] { border-color: var(--borda); background: var(--ardosia-alta); }
-  .item-ativo { box-shadow: inset 2px 0 0 var(--lacre); }
+  .aba[aria-selected="true"] { border-color: var(--borda); background: var(--mesa-alta); }
+  .item-ativo { box-shadow: inset 2px 0 0 var(--verdete); }
+  .aba-nav {
+    @apply inline-flex items-center h-full px-3 text-ui;
+    color: var(--liquen);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .aba-nav:hover { color: var(--papel); }
+  .aba-nav.ativa { color: var(--papel); border-bottom-color: var(--verdete); }
+
+  /* menus ⋯ */
+  .menu { @apply elev borda rounded-painel absolute z-30 p-1 flex flex-col; min-width: 200px; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+  .menu-item { @apply w-full text-left px-2 min-h-alvo rounded-campo flex items-center gap-2 text-papel; }
+  .menu-item:hover, .menu-item:focus-visible { background: var(--mesa); }
+  .menu-divisoria { height: 1px; background: var(--borda); margin: 4px 0; }
+
+  /* teclas desenhadas como teclas físicas */
+  .tecla {
+    @apply inline-flex items-center justify-center font-ui text-ui-sm rounded-campo px-2;
+    min-width: 26px; height: 24px;
+    border: 1px solid var(--liquen);
+    border-bottom-width: 3px;
+    color: var(--papel);
+    background: var(--mesa);
+  }
 }
 
 /* ───────── Notepad (TipTap) ───────── */
 .notepad .ProseMirror {
-  @apply font-texto text-texto text-osso max-w-medida;
+  @apply font-texto text-texto text-papel max-w-medida;
   outline: none;
   min-height: 240px;
   text-align: left;
@@ -119,7 +233,7 @@
   color: var(--liquen);
   float: left; height: 0; pointer-events: none;
 }
-.mencao { color: var(--osso); text-decoration: underline; text-decoration-color: var(--lacre); text-underline-offset: 3px; cursor: pointer; }
+.mencao { color: var(--papel); text-decoration: underline; text-decoration-color: var(--verdete); text-underline-offset: 3px; cursor: pointer; }
 .mencao-quebrada { text-decoration-style: dashed; text-decoration-color: var(--liquen); }
 .notepad-compacto .ProseMirror { min-height: 96px; }
 
@@ -127,26 +241,26 @@
 .react-flow { --xy-background-color: transparent; }
 .react-flow__node { font-family: inherit; }
 .react-flow__node:focus-visible { outline: none; }
-.react-flow__node:focus-visible .papel { outline: 2px solid var(--lacre); outline-offset: 2px; }
+.react-flow__node:focus-visible .papel-moldura { outline: 2px solid var(--verdete); outline-offset: 3px; }
 .react-flow__handle {
   width: 10px; height: 10px; border-radius: 999px;
-  background: var(--ardosia); border: 2px solid var(--lacre);
+  background: var(--mesa); border: 2px solid var(--verdete);
   opacity: 0;
 }
 .react-flow__node:hover .react-flow__handle, .react-flow__node.selected .react-flow__handle { opacity: 1; }
-.react-flow__edge-textbg { fill: var(--ardosia); }
-.react-flow__connection-path { stroke: var(--lacre); stroke-width: 2; }
+.react-flow__edge-textbg { fill: var(--mesa); }
+.react-flow__connection-path { stroke: var(--verdete); stroke-width: 2; }
 .react-flow__controls { box-shadow: none; }
 .react-flow__controls-button {
-  background: var(--ardosia-alta); border: 1px solid var(--borda); color: var(--osso); width: 32px; height: 32px;
+  background: var(--mesa-alta); border: 1px solid var(--borda); color: var(--papel); width: 32px; height: 32px;
 }
-.react-flow__controls-button svg { fill: var(--osso); }
+.react-flow__controls-button svg { fill: var(--papel); }
 .react-flow__attribution { display: none; }
-.react-flow__minimap { background: var(--ardosia-alta); border-radius: 8px; }
 
-/* fio sendo desenhado: o momento memorável */
+/* fio sendo desenhado: o momento memorável, com uma vibração de fio esticado no fim */
 @keyframes desenhar-fio { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
-.fio-novo { stroke-dasharray: var(--len); animation: desenhar-fio 350ms ease-out both; }
+@keyframes fio-vibra { 0%, 100% { transform: translateY(0); } 25% { transform: translateY(1px); } 75% { transform: translateY(-1px); } }
+.fio-novo { stroke-dasharray: var(--len); animation: desenhar-fio 350ms ease-out both, fio-vibra 140ms linear 350ms 1; }
 
 .foco-esmaecido { opacity: .25; }
 
@@ -156,6 +270,6 @@
 @keyframes painel-entra { from { transform: translateX(24px); } to { transform: translateX(0); } }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0ms !important; transition-duration: 0ms !important; }
+  *, *::before, *::after { animation-duration: 0ms !important; animation-delay: 0ms !important; transition-duration: 0ms !important; }
   .fio-novo { animation: none; stroke-dasharray: none; }
 }

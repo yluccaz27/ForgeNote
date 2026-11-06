@@ -1,24 +1,31 @@
 import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { getBackend, uid, useTable, useWsTable, write } from '../../lib/data'
 import { comprimir, useImagem } from '../../lib/images'
+import { reduzMovimento } from '../../lib/hooks'
+import { excluirGaveteiro } from '../../lib/excluir'
 import { toast, toastErro, useUI } from '../../store/ui'
 import { Modal } from '../../components/Modal'
+import { MenuMais } from '../../components/Menu'
+import { ConfirmarExclusao } from '../../components/ConfirmarExclusao'
 import { IconMais } from '../../components/Icons'
 import type { Gaveteiro } from '../../lib/types'
 
-// cores de capa: a mesma família dessaturada das marcações, mais escura para o texto osso
-export const CORES_CAPA = ['#2F363B', ...[75, 150, 190, 230, 265, 300, 340].map((h) => `oklch(38% 0.04 ${h})`)]
+// cores de capa: a mesma família dessaturada das marcações, mais escura para o texto papel
+export const CORES_CAPA = ['#2A3135', ...[75, 150, 190, 230, 265, 300, 340].map((h) => `oklch(38% 0.04 ${h})`)]
 const ICONES = ['✶', '▤', '☾', '⚔', '⌂', '✦', '◈', '☉']
 
 export function GaveteiroGrid() {
   const gavs = useWsTable('gaveteiros')
   const pastas = useTable('pastas')
   const notePasta = useTable('note_pasta')
+  const notes = useWsTable('notes')
   const [editar, setEditar] = useState<Gaveteiro | 'novo' | null>(null)
+  const [excluir, setExcluir] = useState<Gaveteiro | null>(null)
+  const vivos = new Set(notes.map((n) => n.id))
   const contagem = (gid: string) => {
     const ps = new Set(pastas.filter((p) => p.gaveteiro_id === gid).map((p) => p.id))
-    return new Set(notePasta.filter((x) => ps.has(x.pasta_id)).map((x) => x.note_id)).size
+    return new Set(notePasta.filter((x) => ps.has(x.pasta_id) && vivos.has(x.note_id)).map((x) => x.note_id)).size
   }
 
   return (
@@ -28,31 +35,63 @@ export function GaveteiroGrid() {
         <div className="flex-1" />
         <button className="btn" onClick={() => setEditar('novo')}><IconMais width={16} height={16} /> Novo gaveteiro</button>
       </div>
-      {gavs.length === 0 && <p className="mb-4">Um gaveteiro é um projeto: o ACDB, uma campanha de RPG. Crie o primeiro.</p>}
-      <ul className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+      {gavs.length === 0 && (
+        <div className="flex flex-col items-start gap-3 mb-4">
+          <p>Um gaveteiro é um projeto: um livro, uma campanha de RPG. Dentro dele ficam as pastas com os notes.</p>
+          <button className="btn" onClick={() => setEditar('novo')}><IconMais width={16} height={16} /> Novo gaveteiro</button>
+        </div>
+      )}
+      <ul className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
         {[...gavs].sort((a, b) => a.ordem - b.ordem).map((g) => (
           <li key={g.id} className="relative">
-            <Capa g={g} contagem={contagem(g.id)} />
-            <button className="btn-fantasma text-ui-sm absolute" style={{ top: 8, right: 8, background: 'rgb(34 39 43 / .6)' }}
-              onClick={() => setEditar(g)}>Editar</button>
+            <FrenteGaveta g={g} contagem={contagem(g.id)} />
+            <MenuMais rotulo={`Opções do gaveteiro ${g.nome}`} className="absolute" style={{ top: 8, right: 8 }}
+              itens={[{ rotulo: 'Editar gaveteiro…', onClick: () => setEditar(g) }]} excluir={() => setExcluir(g)} />
           </li>
         ))}
       </ul>
       {editar && <EditarGaveteiro g={editar === 'novo' ? null : editar} onFechar={() => setEditar(null)} />}
+      {excluir && (() => {
+        const n = contagem(excluir.id)
+        const np = pastas.filter((p) => p.gaveteiro_id === excluir.id).length
+        return (
+          <ConfirmarExclusao oque="o gaveteiro" nome={excluir.nome} acao="Excluir gaveteiro" digitarNome={n > 0}
+            onExcluir={() => excluirGaveteiro(excluir.id)} onFechar={() => setExcluir(null)}>
+            <p>{np === 1 ? 'A pasta dele sai junto.' : `As ${np} pastas dele saem junto.`}</p>
+            <p>{n > 0 ? `Os ${n === 1 ? 'note guardado' : `${n} notes guardados`} aqui continuam existindo, em outros gaveteiros, no quadro e na timeline.` : 'Não há notes guardados aqui.'}</p>
+          </ConfirmarExclusao>
+        )
+      })()}
     </div>
   )
 }
 
-function Capa({ g, contagem }: { g: Gaveteiro; contagem: number }) {
+/** Frente de gaveta de fichário: porta-etiqueta de latão com o nome e um puxador. */
+function FrenteGaveta({ g, contagem }: { g: Gaveteiro; contagem: number }) {
   const img = useImagem(g.capa_url)
+  const nav = useNavigate()
+  const [abrindo, setAbrindo] = useState(false)
   return (
-    <Link to={`/gaveteiro/${g.id}`} className="block rounded-painel overflow-hidden relative borda" style={{ aspectRatio: '3 / 4', background: g.cor }}>
-      {img && <img src={img} alt="" className="absolute inset-0 w-full h-full" style={{ objectFit: 'cover', opacity: 0.55 }} />}
-      <div className="absolute left-0 right-0 bottom-0 flex flex-col justify-end p-4" style={{ background: img ? 'rgb(34 39 43 / .8)' : undefined }}>
-        <span aria-hidden className="text-ui-lg mb-2">{g.icone}</span>
-        <span className="font-texto text-titulo-gaveteiro" style={{ overflowWrap: 'anywhere' }}>{g.nome}</span>
-        <span className="text-ui-sm mt-1" style={{ opacity: 0.8 }}>{contagem} {contagem === 1 ? 'note' : 'notes'}</span>
-      </div>
+    <Link to={`/gaveteiro/${g.id}`} className={`gaveta ${abrindo ? 'gaveta-abrindo' : ''}`}
+      style={{ ['--frente' as string]: g.cor }}
+      onClick={(e) => {
+        // a gaveta desliza 8px antes da troca de tela
+        if (reduzMovimento() || e.ctrlKey || e.metaKey) return
+        e.preventDefault(); setAbrindo(true)
+        setTimeout(() => nav(`/gaveteiro/${g.id}`), 160)
+      }}>
+      <span className="porta-etiqueta">
+        {img ? (
+          <span className="etiqueta-papel flex items-center gap-2">
+            <img src={img} alt="" className="rounded-papel shrink-0" style={{ width: 40, height: 40, objectFit: 'cover' }} />
+            <span className="font-texto text-titulo-gaveteiro flex-1" style={{ overflowWrap: 'anywhere' }}>{g.nome}</span>
+          </span>
+        ) : (
+          <span className="font-texto text-titulo-gaveteiro text-center" style={{ overflowWrap: 'anywhere' }}>{g.nome}</span>
+        )}
+      </span>
+      <span className="puxador" aria-hidden />
+      <span className="text-ui-sm meta">{contagem} {contagem === 1 ? 'note' : 'notes'}</span>
     </Link>
   )
 }
@@ -94,13 +133,13 @@ function EditarGaveteiro({ g, onFechar }: { g: Gaveteiro | null; onFechar: () =>
           <div className="flex flex-wrap gap-2">
             {CORES_CAPA.map((c) => (
               <button type="button" key={c} aria-label={`Cor ${c}`} aria-pressed={cor === c} onClick={() => setCor(c)}
-                className="rounded-campo" style={{ width: 32, height: 32, background: c, border: cor === c ? '2px solid var(--osso)' : '1px solid var(--borda)' }} />
+                className="rounded-campo" style={{ width: 32, height: 32, background: c, border: cor === c ? '2px solid var(--papel)' : '1px solid var(--borda)' }} />
             ))}
           </div>
         </fieldset>
         <fieldset><legend className="mb-1">Ícone</legend>
           <div className="flex flex-wrap gap-1">
-            {ICONES.map((i) => <button type="button" key={i} aria-pressed={icone === i} className={`btn-icone ${icone === i ? 'item-ativo bg-ardosia' : ''}`} onClick={() => setIcone(i)}>{i}</button>)}
+            {ICONES.map((i) => <button type="button" key={i} aria-pressed={icone === i} className={`btn-icone ${icone === i ? 'item-ativo bg-mesa' : ''}`} onClick={() => setIcone(i)}>{i}</button>)}
           </div>
         </fieldset>
         <div className="flex items-center gap-2">
@@ -108,13 +147,7 @@ function EditarGaveteiro({ g, onFechar }: { g: Gaveteiro | null; onFechar: () =>
           <button type="button" className="btn" disabled={enviando} onClick={() => file.current?.click()}>{enviando ? 'Enviando…' : capa ? 'Trocar capa' : 'Enviar capa'}</button>
           {capa && <button type="button" className="btn-fantasma meta" onClick={() => setCapa(null)}>Remover capa</button>}
         </div>
-        <div className="flex justify-between gap-2 borda-t pt-4">
-          {g ? (
-            <button type="button" className="btn" onClick={() => {
-              if (!confirm(`Excluir o gaveteiro "${g.nome}" e suas pastas? Os notes continuam existindo.`)) return
-              write.remove('gaveteiros', { id: g.id }); toast('Gaveteiro excluído'); onFechar()
-            }}>Excluir gaveteiro</button>
-          ) : <span />}
+        <div className="flex justify-end gap-2 borda-t pt-4">
           <div className="flex gap-2">
             <button type="button" className="btn" onClick={onFechar}>Cancelar</button>
             <button className="btn-primario">{g ? 'Salvar gaveteiro' : 'Criar gaveteiro'}</button>

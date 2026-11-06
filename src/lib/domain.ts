@@ -17,7 +17,26 @@ export function noteDoCampo(campoId: string): string | null {
   const c = cache('note_campos').find((x) => x.id === campoId)
   return c ? cache('note_abas').find((a) => a.id === c.aba_id)?.note_id ?? null : null
 }
-const ehCampoTitulo = (c: NoteCampo) => c.tipo === 'texto' && ['nome', 'titulo'].includes(normalizar(c.nome.trim()))
+/** "Nome", "Nome completo", "Título": campos que dizem como a coisa se chama no mundo. */
+const ehCampoNome = (c: { tipo: TipoCampo; nome: string }) => {
+  const n = normalizar(c.nome.trim())
+  return c.tipo === 'texto' && (n === 'titulo' || n === 'nome' || n.startsWith('nome '))
+}
+/** O primeiro campo de nome da ficha (pela ordem das seções e dos campos). */
+export function campoNomeDoNote(noteId: string): NoteCampo | undefined {
+  for (const a of abasDoNote(noteId)) {
+    const c = cache('note_campos').filter((x) => x.aba_id === a.id).sort((x, y) => x.ordem - y.ordem).find(ehCampoNome)
+    if (c) return c
+  }
+  return undefined
+}
+/** Título ligado (padrão): acompanha o primeiro campo de nome. */
+export const tituloLigado = (n: Note) => n.titulo_ligado !== false
+const ehCampoTitulo = (c: NoteCampo) => {
+  const noteId = noteDoCampo(c.id)
+  const note = noteId ? cache('notes').find((n) => n.id === noteId) : undefined
+  return !!note && tituloLigado(note) && campoNomeDoNote(note.id)?.id === c.id
+}
 
 /** Pastas em que o note está. */
 export function pastasDoNote(noteId: string): Pasta[] {
@@ -31,26 +50,12 @@ export function criarNote(opts: { workspaceId: string; predefinicaoId: string | 
   const titulo = opts.titulo?.trim()
   const note: Note = {
     id, workspace_id: opts.workspaceId, predefinicao_id: opts.predefinicaoId,
-    titulo: titulo || 'Sem título', titulo_provisorio: !titulo,
+    titulo: titulo || 'Sem título', titulo_provisorio: !titulo, titulo_ligado: true,
     resumo: '', resumo_provisorio: true, corpo_json: null,
     created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
   }
   write.insert('notes', [note])
-  if (opts.predefinicaoId) {
-    // copia a estrutura: editar o note depois não mexe na predefinição
-    const abas = cache('predef_abas').filter((a) => a.predefinicao_id === opts.predefinicaoId).sort((a, b) => a.ordem - b.ordem)
-    const novasAbas = abas.map((a) => ({ id: uid(), note_id: id, nome: a.nome, ordem: a.ordem, _de: a.id }))
-    write.insert('note_abas', novasAbas.map(({ _de, ...a }) => a))
-    const campos = novasAbas.flatMap((na) =>
-      cache('predef_campos').filter((c) => c.aba_id === na._de).map((c) => ({
-        id: uid(), aba_id: na.id, nome: c.nome, tipo: c.tipo, config_json: structuredClone(c.config_json ?? {}),
-        ordem: c.ordem, organiza_pasta: c.organiza_pasta,
-      })),
-    )
-    write.insert('note_campos', campos)
-    const ct = campos.find(ehCampoTitulo)
-    if (ct && titulo) write.insert('note_valores', [{ id: uid(), campo_id: ct.id, valor_json: titulo }])
-  }
+  if (opts.predefinicaoId) copiarEstrutura(id, opts.predefinicaoId, titulo)
   if (opts.pastaId) write.insert('note_pasta', [{ note_id: id, pasta_id: opts.pastaId }])
   else {
     // sem pasta escolhida: entra na primeira pasta manual do primeiro gaveteiro, para não ficar perdido
@@ -58,6 +63,60 @@ export function criarNote(opts: { workspaceId: string; predefinicaoId: string | 
     const pasta = gav && cache('pastas').find((p) => p.gaveteiro_id === gav.id && p.origem === 'manual')
     if (pasta) write.insert('note_pasta', [{ note_id: id, pasta_id: pasta.id }])
   }
+  return id
+}
+
+/** Copia seções e campos da predefinição: editar o note depois não mexe nela. */
+function copiarEstrutura(noteId: string, predefId: string, titulo?: string) {
+  const abas = cache('predef_abas').filter((a) => a.predefinicao_id === predefId).sort((a, b) => a.ordem - b.ordem)
+  const novasAbas = abas.map((a) => ({ id: uid(), note_id: noteId, nome: a.nome, ordem: a.ordem, _de: a.id }))
+  write.insert('note_abas', novasAbas.map(({ _de, ...a }) => a))
+  const campos = novasAbas.flatMap((na) =>
+    cache('predef_campos').filter((c) => c.aba_id === na._de).sort((a, b) => a.ordem - b.ordem).map((c) => ({
+      id: uid(), aba_id: na.id, nome: c.nome, tipo: c.tipo, config_json: structuredClone(c.config_json ?? {}),
+      ordem: c.ordem, organiza_pasta: c.organiza_pasta,
+    })),
+  )
+  write.insert('note_campos', campos)
+  const ct = campos.find(ehCampoNome)
+  if (ct && titulo) write.insert('note_valores', [{ id: uid(), campo_id: ct.id, valor_json: titulo }])
+}
+
+/** Tipo do note. Sem seções ainda, ganha a estrutura da predefinição escolhida. */
+export function definirTipo(noteId: string, predefId: string | null) {
+  write.update('notes', { id: noteId }, { predefinicao_id: predefId })
+  if (predefId && abasDoNote(noteId).length === 0) {
+    const note = cache('notes').find((n) => n.id === noteId)
+    copiarEstrutura(noteId, predefId, note && !note.titulo_provisorio ? note.titulo : undefined)
+    sincronizarPastas(noteId)
+  }
+}
+
+/** Liga ou desliga o título do campo Nome. Ao ligar, os dois passam a ser iguais. */
+export function alternarTituloLigado(noteId: string) {
+  const note = cache('notes').find((n) => n.id === noteId)
+  if (!note) return
+  const ligar = !tituloLigado(note)
+  write.update('notes', { id: noteId }, { titulo_ligado: ligar })
+  const cn = campoNomeDoNote(noteId)
+  if (!ligar || !cn) return
+  const nome = String(valorDe(cn.id) ?? '').trim()
+  if (nome) { write.update('notes', { id: noteId }, { titulo: nome, titulo_provisorio: false }); renomearPastasDe(noteId, nome) }
+  else if (!note.titulo_provisorio) gravarValor(cn.id, note.titulo)
+}
+
+/** Guardar em pasta direto do note. */
+export function guardarEm(noteId: string, pastaId: string, dentro: boolean) {
+  const ja = cache('note_pasta').some((x) => x.note_id === noteId && x.pasta_id === pastaId)
+  if (dentro && !ja) write.insert('note_pasta', [{ note_id: noteId, pasta_id: pastaId }])
+  if (!dentro && ja) write.remove('note_pasta', { note_id: noteId, pasta_id: pastaId })
+  // um gaveteiro novo também recebe as pastas automáticas do note
+  sincronizarPastas(noteId)
+}
+
+export function novaPasta(gaveteiroId: string, nome: string): string {
+  const id = uid()
+  write.insert('pastas', [{ id, gaveteiro_id: gaveteiroId, nome, cor: null, origem: 'manual', regra_campo_id: null, regra_valor_note_id: null, regra_valor_texto: null }])
   return id
 }
 
@@ -84,7 +143,7 @@ export function definirTitulo(noteId: string, titulo: string) {
   const note = cache('notes').find((n) => n.id === noteId)
   if (!note) return
   const t = titulo.trim()
-  const ct = camposDoNote(noteId).find(ehCampoTitulo)
+  const ct = tituloLigado(note) ? campoNomeDoNote(noteId) : undefined
   if (t) {
     write.update('notes', { id: noteId }, { titulo: t, titulo_provisorio: false })
     if (ct) gravarValor(ct.id, t)
@@ -195,7 +254,7 @@ export function sincronizarPastas(noteId: string) {
 }
 
 // ───────── estrutura da ficha ─────────
-export function novaAba(noteId: string, nome = 'Nova aba') {
+export function novaAba(noteId: string, nome = 'Nova seção') {
   const ordem = abasDoNote(noteId).length
   const id = uid()
   write.insert('note_abas', [{ id, note_id: noteId, nome, ordem }])
@@ -260,7 +319,7 @@ export function salvarComoPredefinicao(noteId: string, nome: string, icone: stri
   sincronizarPastas(noteId)
 }
 
-// ───────── exclusão ─────────
+// ───────── exclusão (ver lib/excluir.ts) ─────────
 /** Onde o note é usado: relações de outros notes, eventos, trilhas. */
 export function usosDoNote(noteId: string): string[] {
   const out: string[] = []
@@ -273,17 +332,6 @@ export function usosDoNote(noteId: string): string[] {
   for (const t of cache('trilhas').filter((t) => t.note_id === noteId)) out.push(`trilha ${t.nome}`)
   return out
 }
-export function excluirNote(noteId: string) {
-  // remove o id dos campos de relação que apontam para ele
-  for (const c of cache('conexoes').filter((c) => c.destino_note_id === noteId && c.tipo === 'campo' && c.campo_id)) {
-    const v = asArray(valorDe(c.campo_id!)).filter((x) => x !== noteId)
-    gravarValor(c.campo_id!, v)
-  }
-  const regra = cache('pastas').filter((p) => p.regra_valor_note_id === noteId).map((p) => p.id)
-  if (regra.length) write.remove('pastas', { id: regra })
-  write.remove('notes', { id: noteId })
-}
-
 // ───────── busca ─────────
 export function buscar(workspaceId: string, q: string) {
   const termo = normalizar(q.trim())

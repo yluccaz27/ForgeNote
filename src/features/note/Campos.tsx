@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTable, useWsTable, write } from '../../lib/data'
-import { asArray, definirValor, removerCampo, renomearCampo } from '../../lib/domain'
+import { asArray, definirValor, novoCampo, renomearCampo } from '../../lib/domain'
 import { anoAbsoluto, diaDePartes, eraIndexDoAno, erasOrdenadas, formatarDia, anoNaEra, partesDeDia } from '../../lib/calendar'
 import { useCalendario, usePopover } from '../../lib/hooks'
 import { comprimir, useImagem } from '../../lib/images'
@@ -10,10 +10,55 @@ import { normalizar } from '../../lib/text'
 import { corMarcacao } from '../../lib/color'
 import { toastErro, useUI } from '../../store/ui'
 import type { CampoConfig, DiaJson, NoteCampo, TipoCampo } from '../../lib/types'
-import { IconFechar, IconLixo, IconSeta } from '../../components/Icons'
+import { IconFechar, IconSeta } from '../../components/Icons'
+import { Modal } from '../../components/Modal'
 
 export const NOMES_TIPO: Record<TipoCampo, string> = {
   texto: 'Texto', numero: 'Número', data: 'Data', selecao: 'Seleção', relacao: 'Relação', imagem: 'Imagem',
+}
+
+/** O que cada tipo é, para o seletor de "+ Campo". */
+export const TIPOS_INFO: { tipo: TipoCampo; explica: string; exemplo: string }[] = [
+  { tipo: 'texto', explica: 'Qualquer informação escrita curta', exemplo: 'Apelido, aparência, origem' },
+  { tipo: 'numero', explica: 'Valores que podem ser comparados', exemplo: 'Idade, altura, população' },
+  { tipo: 'data', explica: 'Uma data no calendário do mundo. Pode virar marco na timeline', exemplo: 'Nascimento, fundação' },
+  { tipo: 'selecao', explica: 'Uma lista fixa de opções que você define', exemplo: 'Status: vivo, morto, desaparecido' },
+  { tipo: 'relacao', explica: 'Aponta para outro note. Cria a conexão no quadro sozinho', exemplo: 'Facção, família, mestre' },
+  { tipo: 'imagem', explica: 'Uma imagem guardada com o note', exemplo: 'Retrato, brasão, mapa' },
+]
+
+export function NovoCampoModal({ abaId, onFechar }: { abaId: string; onFechar: () => void }) {
+  const [nome, setNome] = useState('')
+  const [tipo, setTipo] = useState<TipoCampo>('texto')
+  return (
+    <Modal titulo="Novo campo" onFechar={onFechar} largura={560}>
+      <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); novoCampo(abaId, tipo, nome.trim() || NOMES_TIPO[tipo]); onFechar() }}>
+        <label className="flex flex-col gap-1"><span className="rotulo">Nome do campo</span>
+          <input className="campo valor" placeholder="Nome do campo, ex.: Facção" value={nome} onChange={(e) => setNome(e.target.value)} />
+        </label>
+        <fieldset>
+          <legend className="rotulo mb-2">Tipo</legend>
+          <div className="flex flex-col gap-1">
+            {TIPOS_INFO.map((t) => (
+              <label key={t.tipo} className="flex items-start gap-3 rounded-campo px-3 py-2 cursor-pointer"
+                style={{ border: `1px solid ${tipo === t.tipo ? 'var(--verdete)' : 'var(--borda)'}`, background: tipo === t.tipo ? 'var(--mesa)' : undefined }}>
+                <input type="radio" name="tipo-campo" style={{ marginTop: 4 }} checked={tipo === t.tipo} onChange={() => setTipo(t.tipo)} />
+                <span className="flex flex-col">
+                  <span className="font-semibold">{NOMES_TIPO[t.tipo]}</span>
+                  <span>{t.explica}</span>
+                  <span className="meta text-ui-sm">Ex.: {t.exemplo}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <div className="flex justify-end gap-2">
+          <button type="button" className="btn-fantasma" onClick={onFechar}>Cancelar</button>
+          <button className="btn-primario">Adicionar campo</button>
+        </div>
+      </form>
+    </Modal>
+  )
 }
 
 export function ValorCampo({ campo, noteId }: { campo: NoteCampo; noteId: string }) {
@@ -33,7 +78,7 @@ export function ValorCampo({ campo, noteId }: { campo: NoteCampo; noteId: string
 // uma edição do outro usuário recarrega o campo
 function TextoCampo({ campo, valor }: { campo: NoteCampo; valor?: string }) {
   return (
-    <input key={valor ?? ''} className="campo" defaultValue={valor ?? ''} aria-label={campo.nome}
+    <input key={valor ?? ''} className="campo valor" defaultValue={valor ?? ''} aria-label={campo.nome} placeholder="Escreva aqui"
       onBlur={(e) => { if (e.target.value !== (valor ?? '')) definirValor(campo.id, e.target.value) }}
       onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />
   )
@@ -41,7 +86,7 @@ function TextoCampo({ campo, valor }: { campo: NoteCampo; valor?: string }) {
 
 function NumeroCampo({ campo, valor }: { campo: NoteCampo; valor?: number }) {
   return (
-    <input key={String(valor)} className="campo" inputMode="decimal" defaultValue={valor == null ? '' : String(valor)} aria-label={campo.nome}
+    <input key={String(valor)} className="campo valor" inputMode="decimal" defaultValue={valor == null ? '' : String(valor)} aria-label={campo.nome} placeholder="0"
       onBlur={(e) => {
         const t = e.target.value.trim()
         const n = t === '' ? null : Number(t.replace(',', '.'))
@@ -94,9 +139,13 @@ export function DataInput({ valor, onChange, rotulo }: { valor: number | null; o
 
 function DataCampo({ campo, valor }: { campo: NoteCampo; valor: DiaJson | null }) {
   const cal = useCalendario()
+  const [escolhendo, setEscolhendo] = useState(false)
+  if (!valor && !escolhendo) {
+    return <button className="campo campo-vazio text-left" aria-label={`${campo.nome}: escolha a data`} onClick={() => setEscolhendo(true)}>Escolha a data</button>
+  }
   return (
     <div>
-      <DataInput rotulo={campo.nome} valor={valor?.dia ?? null} onChange={(d) => definirValor(campo.id, d == null ? null : { dia: d })} />
+      <DataInput rotulo={campo.nome} valor={valor?.dia ?? null} onChange={(d) => { definirValor(campo.id, d == null ? null : { dia: d }); if (d == null) setEscolhendo(false) }} />
       {valor && <p className="meta text-ui-sm mt-1">{formatarDia(cal, valor.dia)}{campo.config_json.marco ? ', marco na timeline' : ''}</p>}
     </div>
   )
@@ -116,16 +165,16 @@ function SelecaoCampo({ campo, valor }: { campo: NoteCampo; valor: unknown }) {
     <div className="relative" ref={pop.ref}>
       <button className="campo flex items-center gap-1 flex-wrap text-left" aria-haspopup="listbox" aria-expanded={pop.aberto}
         aria-label={`${campo.nome}: ${sel.join(', ') || 'vazio'}`} onClick={() => pop.setAberto(!pop.aberto)}>
-        {sel.length === 0 && <span className="meta">Escolher</span>}
-        {multiplo ? sel.map((s) => <span key={s} className="chip">{s}</span>) : <span>{sel[0]}</span>}
+        {sel.length === 0 && <span className="meta">Escolha uma opção</span>}
+        {multiplo ? sel.map((s) => <span key={s} className="chip valor">{s}</span>) : <span className="valor">{sel[0]}</span>}
         <span className="flex-1" /><IconSeta width={14} height={14} className="meta" />
       </button>
       {pop.aberto && (
         <div className="elev borda rounded-painel absolute z-20 mt-1 w-full p-1" role="listbox" aria-multiselectable={multiplo}>
-          {opcoes.length === 0 && <p className="meta p-2">Sem opções. Adicione nas configurações do campo.</p>}
+          {opcoes.length === 0 && <p className="meta p-2">Sem opções ainda. Abra as opções do campo (⋯, Configurar campo) e escreva uma por linha.</p>}
           {opcoes.map((o) => (
             <button key={o} role="option" aria-selected={sel.includes(o)}
-              className={`w-full text-left px-2 min-h-alvo rounded-campo ${sel.includes(o) ? 'item-ativo bg-ardosia' : ''}`}
+              className={`w-full text-left px-2 min-h-alvo rounded-campo ${sel.includes(o) ? 'item-ativo bg-mesa' : ''}`}
               onClick={() => alternar(o)}>{o}</button>
           ))}
         </div>
@@ -135,8 +184,10 @@ function SelecaoCampo({ campo, valor }: { campo: NoteCampo; valor: unknown }) {
 }
 
 // ───────── Relação (estilo Notion) ─────────
-function RelacaoCampo({ campo, valor, noteId }: { campo: NoteCampo; valor: string[]; noteId: string }) {
+function RelacaoCampo({ campo, valor: bruto, noteId }: { campo: NoteCampo; valor: string[]; noteId: string }) {
   const notes = useWsTable('notes')
+  // notes na lixeira somem da relação (voltam se a exclusão for desfeita)
+  const valor = bruto.filter((id) => notes.some((n) => n.id === id))
   const notePasta = useTable('note_pasta')
   const abrirCriar = useUI((s) => s.abrirCriar)
   const pop = usePopover()
@@ -181,17 +232,17 @@ function RelacaoCampo({ campo, valor, noteId }: { campo: NoteCampo; valor: strin
           const n = notes.find((x) => x.id === id)
           return (
             <span key={id} className="chip" style={{ borderLeft: `3px solid ${corMarcacao(n?.predefinicao_id)}` }}>
-              <Link to={`/note/${id}`} className="font-texto">{n?.titulo ?? 'Note removido'}</Link>
+              <Link to={`/note/${id}`} className="font-texto">{n?.titulo}</Link>
               <button aria-label={`Remover ${n?.titulo ?? ''}`} onClick={() => escolher(id)} className="meta"><IconFechar width={12} height={12} /></button>
             </span>
           )
         })}
         <button className="btn-fantasma meta text-ui-sm" style={{ minHeight: 24 }} aria-haspopup="listbox" aria-expanded={pop.aberto}
-          onClick={() => { pop.setAberto(!pop.aberto); setI(0) }}>{valor.length ? 'Adicionar' : 'Escolher'}</button>
+          onClick={() => { pop.setAberto(!pop.aberto); setI(0) }}>{valor.length ? 'Adicionar' : 'Buscar ou criar note'}</button>
       </div>
       {pop.aberto && (
         <div className="elev borda rounded-painel absolute z-20 mt-1 w-full p-1" style={{ minWidth: 240 }}>
-          <input className="campo mb-1" autoFocus placeholder="Buscar ou criar" value={q} aria-label={`Buscar em ${campo.nome}`}
+          <input className="campo valor mb-1" autoFocus placeholder="Buscar ou criar note" value={q} aria-label={`Buscar em ${campo.nome}`}
             onChange={(e) => { setQ(e.target.value); setI(0) }}
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown') { e.preventDefault(); setI((x) => Math.min(total - 1, x + 1)) }
@@ -201,7 +252,7 @@ function RelacaoCampo({ campo, valor, noteId }: { campo: NoteCampo; valor: strin
           <div role="listbox" aria-multiselectable={multiplo} className="overflow-auto" style={{ maxHeight: 240 }}>
             {candidatos.map((n, idx) => (
               <button key={n.id} role="option" aria-selected={valor.includes(n.id)} onMouseEnter={() => setI(idx)}
-                className={`w-full text-left px-2 min-h-alvo rounded-campo flex items-center gap-2 ${idx === i ? 'bg-ardosia' : ''} ${valor.includes(n.id) ? 'item-ativo' : ''}`}
+                className={`w-full text-left px-2 min-h-alvo rounded-campo flex items-center gap-2 ${idx === i ? 'bg-mesa' : ''} ${valor.includes(n.id) ? 'item-ativo' : ''}`}
                 onClick={() => escolher(n.id)}>
                 <span aria-hidden style={{ width: 3, height: 16, background: corMarcacao(n.predefinicao_id) }} />
                 <span className="font-texto">{n.titulo}</span>
@@ -209,7 +260,7 @@ function RelacaoCampo({ campo, valor, noteId }: { campo: NoteCampo; valor: strin
             ))}
             {candidatos.length === 0 && !podeCriar && <p className="meta p-2">Nenhum note combina com o filtro deste campo.</p>}
             {podeCriar && (
-              <button className={`w-full text-left px-2 min-h-alvo rounded-campo ${i === candidatos.length ? 'bg-ardosia' : ''}`}
+              <button className={`w-full text-left px-2 min-h-alvo rounded-campo ${i === candidatos.length ? 'bg-mesa' : ''}`}
                 onMouseEnter={() => setI(candidatos.length)} onClick={criarNovo}>+ Criar "{q.trim()}"</button>
             )}
           </div>
@@ -225,6 +276,7 @@ function ImagemCampo({ campo, valor }: { campo: NoteCampo; valor: string | null 
   const ws = useUI((s) => s.wsId)
   const [enviando, setEnviando] = useState(false)
   const input = useRef<HTMLInputElement>(null)
+  const [sobre, setSobre] = useState(false)
   async function enviar(f: File) {
     if (!ws) return
     setEnviando(true)
@@ -240,7 +292,13 @@ function ImagemCampo({ campo, valor }: { campo: NoteCampo; valor: string | null 
       {url && <img src={url} alt={campo.nome} className="rounded-papel" style={{ width: 64, height: 64, objectFit: 'cover' }} />}
       <input ref={input} type="file" accept="image/*" className="sr-only" aria-label={`Enviar ${campo.nome}`}
         onChange={(e) => { const f = e.target.files?.[0]; if (f) enviar(f); e.target.value = '' }} />
-      <button className="btn" disabled={enviando} onClick={() => input.current?.click()}>{enviando ? 'Enviando…' : url ? 'Trocar imagem' : 'Enviar imagem'}</button>
+      <button className={`campo ${url ? '' : 'campo-vazio'} text-left flex-1`} disabled={enviando}
+        style={sobre ? { borderColor: 'var(--verdete)', borderStyle: 'solid' } : { minHeight: url ? 32 : 48 }}
+        onClick={() => input.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setSobre(true) }} onDragLeave={() => setSobre(false)}
+        onDrop={(e) => { e.preventDefault(); setSobre(false); const f = e.dataTransfer.files?.[0]; if (f?.type.startsWith('image/')) enviar(f) }}>
+        {enviando ? 'Enviando…' : url ? 'Trocar imagem' : 'Arraste uma imagem ou clique para escolher'}
+      </button>
       {valor && <button className="btn-fantasma meta" onClick={() => definirValor(campo.id, null)}>Remover</button>}
     </div>
   )
@@ -252,8 +310,9 @@ export function ConfigCampo({ campo, onFechar }: { campo: NoteCampo; onFechar: (
   const gavs = useWsTable('gaveteiros')
   const pastas = useTable('pastas')
   const [nome, setNome] = useState(campo.nome)
-  const [novaOpcao, setNovaOpcao] = useState('')
+  const [opcoesTexto, setOpcoesTexto] = useState((campo.config_json.opcoes ?? []).join('\n'))
   const cfg = campo.config_json
+  const info = TIPOS_INFO.find((t) => t.tipo === campo.tipo)
   const setCfg = (patch: Partial<CampoConfig>) => write.update('note_campos', { id: campo.id }, { config_json: { ...cfg, ...patch } })
   const toggle = (lista: string[] | undefined, id: string) => (lista ?? []).includes(id) ? (lista ?? []).filter((x) => x !== id) : [...(lista ?? []), id]
   const pastasWs = pastas.filter((p) => gavs.some((g) => g.id === p.gaveteiro_id))
@@ -261,27 +320,21 @@ export function ConfigCampo({ campo, onFechar }: { campo: NoteCampo; onFechar: (
   return (
     <div className="flex flex-col gap-3">
       <label className="flex flex-col gap-1">
-        <span>Nome do campo</span>
-        <input className="campo" value={nome} onChange={(e) => setNome(e.target.value)}
+        <span className="rotulo">Nome do campo</span>
+        <input className="campo valor" value={nome} placeholder="Nome do campo, ex.: Facção" onChange={(e) => setNome(e.target.value)}
           onBlur={() => nome.trim() && nome !== campo.nome && renomearCampo(campo.id, nome.trim())} />
       </label>
-      <p className="meta">Tipo: {NOMES_TIPO[campo.tipo]}</p>
+      <p><span className="font-semibold">{NOMES_TIPO[campo.tipo]}</span>: {info?.explica}. <span className="meta">Ex.: {info?.exemplo}</span></p>
 
       {campo.tipo === 'selecao' && (
         <>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={!!cfg.multiplo} onChange={(e) => setCfg({ multiplo: e.target.checked })} /> Permitir várias opções</label>
-          <div>
-            <p className="mb-1">Opções</p>
-            <div className="flex flex-wrap gap-1 mb-2">
-              {(cfg.opcoes ?? []).map((o) => (
-                <span key={o} className="chip">{o}<button aria-label={`Remover opção ${o}`} onClick={() => setCfg({ opcoes: (cfg.opcoes ?? []).filter((x) => x !== o) })}><IconFechar width={12} height={12} /></button></span>
-              ))}
-            </div>
-            <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); const o = novaOpcao.trim(); if (o && !(cfg.opcoes ?? []).includes(o)) setCfg({ opcoes: [...(cfg.opcoes ?? []), o] }); setNovaOpcao('') }}>
-              <input className="campo" placeholder="Nova opção" value={novaOpcao} onChange={(e) => setNovaOpcao(e.target.value)} />
-              <button className="btn">Adicionar</button>
-            </form>
-          </div>
+          <label className="flex flex-col gap-1">
+            <span className="rotulo">Opções</span>
+            <textarea className="campo valor py-2" rows={5} placeholder="Uma opção por linha" value={opcoesTexto}
+              onChange={(e) => setOpcoesTexto(e.target.value)}
+              onBlur={() => setCfg({ opcoes: [...new Set(opcoesTexto.split('\n').map((s) => s.trim()).filter(Boolean))] })} />
+          </label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={!!cfg.multiplo} onChange={(e) => setCfg({ multiplo: e.target.checked })} /> Permitir escolher várias opções</label>
         </>
       )}
 
@@ -289,7 +342,7 @@ export function ConfigCampo({ campo, onFechar }: { campo: NoteCampo; onFechar: (
         <>
           <label className="flex items-center gap-2"><input type="checkbox" checked={cfg.multiplo !== false} onChange={(e) => setCfg({ multiplo: e.target.checked })} /> Permitir vários notes</label>
           <fieldset>
-            <legend className="mb-1">Mostrar só notes da predefinição</legend>
+            <legend className="mb-1">Mostrar só notes do tipo…</legend>
             {predefs.length === 0 && <p className="meta">Nenhuma predefinição salva.</p>}
             <div className="flex flex-wrap gap-2">
               {predefs.map((p) => (
@@ -313,9 +366,12 @@ export function ConfigCampo({ campo, onFechar }: { campo: NoteCampo; onFechar: (
         <label className="flex items-center gap-2"><input type="checkbox" checked={!!cfg.marco} onChange={(e) => setCfg({ marco: e.target.checked })} /> Marco de timeline (aparece na trilha deste note)</label>
       )}
 
-      <div className="borda-t pt-3 flex justify-between">
-        <button className="btn" onClick={() => { removerCampo(campo.id); onFechar() }}><IconLixo width={16} height={16} /> Excluir campo</button>
-        <button className="btn-primario" onClick={onFechar}>Pronto</button>
+      <div className="borda-t pt-3 flex justify-end">
+        <button className="btn-primario" onClick={() => {
+          // salva as opções mesmo sem sair do campo de texto
+          if (campo.tipo === 'selecao') setCfg({ opcoes: [...new Set(opcoesTexto.split('\n').map((s) => s.trim()).filter(Boolean))] })
+          onFechar()
+        }}>Pronto</button>
       </div>
     </div>
   )

@@ -6,6 +6,9 @@ import { normalizar } from '../../lib/text'
 import { toast, useUI } from '../../store/ui'
 import { Papel } from '../../components/Papel'
 import { Modal } from '../../components/Modal'
+import { MenuMais } from '../../components/Menu'
+import { ConfirmarExclusao } from '../../components/ConfirmarExclusao'
+import { excluirPasta } from '../../lib/excluir'
 import { IconEngrenagem, IconFechar, IconMais, IconPasta } from '../../components/Icons'
 import type { Pasta } from '../../lib/types'
 
@@ -23,6 +26,7 @@ export function GaveteiroView() {
   const [sobre, setSobre] = useState<string | null>(null)
   const [renomear, setRenomear] = useState<string | null>(null)
   const [adicionar, setAdicionar] = useState(false)
+  const [excluir, setExcluir] = useState<Pasta | null>(null)
 
   const pastas = useMemo(() => todasPastas.filter((p) => p.gaveteiro_id === id)
     .sort((a, b) => (a.origem === b.origem ? a.nome.localeCompare(b.nome) : a.origem === 'manual' ? -1 : 1)), [todasPastas, id])
@@ -65,15 +69,15 @@ export function GaveteiroView() {
       <nav aria-label="Pastas" className="elev md:borda-r md:w-painel shrink-0 p-4 flex flex-col gap-1" style={{ maxWidth: '100%' }}>
         <Link to="/gaveteiro" className="meta text-ui-sm mb-2">Gaveteiros</Link>
         <h1 className="font-texto text-titulo-note mb-4 flex items-center gap-2"><span aria-hidden className="text-ui-lg">{gav.icone}</span>{gav.nome}</h1>
-        <button className={`text-left px-2 min-h-alvo rounded-campo ${!pasta ? 'item-ativo bg-ardosia' : ''}`} onClick={() => setParams({})}>Todos os notes</button>
+        <button className="guia" aria-current={!pasta} onClick={() => setParams({})}>Todos os notes</button>
         {pastas.map((p) => renomear === p.id ? (
-          <input key={p.id} autoFocus className="campo" defaultValue={p.nome} aria-label="Nome da pasta"
+          <input key={p.id} autoFocus className="campo valor" defaultValue={p.nome} aria-label="Nome da pasta"
             onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== p.nome) write.update('pastas', { id: p.id }, { nome: v }); setRenomear(null) }}
             onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setRenomear(null) }} />
         ) : (
           <button key={p.id}
-            className={`text-left px-2 min-h-alvo rounded-campo flex items-center gap-2 ${pasta?.id === p.id ? 'item-ativo bg-ardosia' : ''}`}
-            style={sobre === p.id ? { outline: '2px dashed var(--lacre)', outlineOffset: -2 } : undefined}
+            className="guia" aria-current={pasta?.id === p.id}
+            style={sobre === p.id ? { outline: '2px dashed var(--verdete)', outlineOffset: -2 } : undefined}
             title={p.origem === 'regra' ? `automática, pelo campo ${p.regra_campo_id ?? ''}` : 'Duplo clique para renomear'}
             onClick={() => setParams({ pasta: p.id })}
             onDoubleClick={() => p.origem === 'manual' && setRenomear(p.id)}
@@ -81,7 +85,7 @@ export function GaveteiroView() {
             onDragLeave={() => setSobre(null)}
             onDrop={(e) => soltar(p, e.ctrlKey || e.altKey)}>
             {p.origem === 'regra' ? <IconEngrenagem width={14} height={14} className="meta" /> : <IconPasta width={16} height={16} className="meta" />}
-            <span className="flex-1 truncate">{p.nome}</span>
+            <span className="flex-1 truncate valor">{p.nome}</span>
             <span className="meta text-ui-sm">{naPasta(p.id).size}</span>
           </button>
         ))}
@@ -91,19 +95,19 @@ export function GaveteiroView() {
 
       <section className="flex-1 min-w-0 p-6" aria-label={pasta ? `Pasta ${pasta.nome}` : 'Todos os notes'}>
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          <h2 className="text-ui-lg font-semibold">{pasta ? pasta.nome : 'Todos os notes'}</h2>
-          {pasta?.origem === 'regra' && <span className="chip meta" title="Mantida pelo campo com 📁">automática</span>}
-          <div className="flex-1" />
+          <h2 className={`text-ui-lg font-semibold ${pasta ? 'font-texto' : ''}`}>{pasta ? pasta.nome : 'Todos os notes'}</h2>
+          {pasta?.origem === 'regra' && <span className="chip meta" title={`Mantida pelo campo ${pasta.regra_campo_id ?? ''}`}>automática</span>}
           {pasta?.origem === 'manual' && (
-            <>
-              <button className="btn" onClick={() => setAdicionar(true)}>Adicionar note existente</button>
-              <button className="btn-fantasma meta" onClick={() => {
-                if (!confirm(`Excluir a pasta "${pasta.nome}"? Os notes continuam no workspace.`)) return
-                write.remove('pastas', { id: pasta.id }); setParams({}); toast('Pasta excluída')
-              }}>Excluir pasta</button>
-            </>
+            <MenuMais rotulo={`Opções da pasta ${pasta.nome}`} alinhar="esquerda"
+              itens={[
+                { rotulo: 'Renomear pasta', onClick: () => setRenomear(pasta.id) },
+                { rotulo: 'Adicionar note existente…', onClick: () => setAdicionar(true) },
+              ]}
+              excluir={() => setExcluir(pasta)} />
           )}
-          <button className="btn-primario" onClick={() => abrirCriar({ pastaId: pasta?.origem === 'manual' ? pasta.id : pastas.find((p) => p.origem === 'manual')?.id })}>Novo note aqui</button>
+          <div className="flex-1" />
+          {pasta?.origem === 'manual' && <button className="btn" onClick={() => setAdicionar(true)}>Adicionar note existente</button>}
+          <button className="btn" onClick={() => abrirCriar({ pastaId: pasta?.origem === 'manual' ? pasta.id : pastas.find((p) => p.origem === 'manual')?.id })}><IconMais width={16} height={16} /> Novo note aqui</button>
         </div>
 
         {visiveis.length === 0 && <p className="meta">{pasta?.origem === 'regra' ? 'Nenhum note tem este valor agora. A pasta some quando ficar vazia.' : 'Arraste notes para cá ou crie um novo.'}</p>}
@@ -119,7 +123,7 @@ export function GaveteiroView() {
                     extra={em.length > 0 && <p className="text-ui-sm mt-1" style={{ opacity: 0.75 }}>também em: {em.join(', ')}</p>} />
                 </button>
                 {pasta?.origem === 'manual' && (
-                  <button className="btn-icone absolute text-ardosia" style={{ top: 4, right: 4 }} aria-label={`Tirar ${n.titulo} desta pasta`}
+                  <button className="btn-icone absolute text-tinta" style={{ top: 4, right: 4 }} aria-label={`Tirar ${n.titulo} desta pasta`}
                     title="Tirar desta pasta" onClick={() => write.remove('note_pasta', { note_id: n.id, pasta_id: pasta.id })}><IconFechar width={14} height={14} /></button>
                 )}
               </li>
@@ -128,6 +132,16 @@ export function GaveteiroView() {
         </ul>
       </section>
       {adicionar && pasta && <AdicionarExistente pasta={pasta} onFechar={() => setAdicionar(false)} />}
+      {excluir && (() => {
+        const n = [...naPasta(excluir.id)].filter((nid) => notes.some((x) => x.id === nid)).length
+        return (
+          <ConfirmarExclusao oque="a pasta" nome={excluir.nome} acao="Excluir pasta"
+            onExcluir={() => { excluirPasta(excluir); setParams({}) }} onFechar={() => setExcluir(null)}>
+            <p>{n ? `Os ${n === 1 ? 'note' : `${n} notes`} dela continuam existindo. Só deixam de estar nesta pasta.` : 'A pasta está vazia.'}</p>
+            <p className="meta">Quadros que mostravam esta pasta deixam de mostrar esses notes.</p>
+          </ConfirmarExclusao>
+        )
+      })()}
     </div>
   )
 }

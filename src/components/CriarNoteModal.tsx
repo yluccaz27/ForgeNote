@@ -29,7 +29,7 @@ export function CriarNoteModal({ req }: { req: NonNullable<ReturnType<typeof use
         <input className="campo font-texto" placeholder="Pode deixar em branco" value={titulo} onChange={(e) => setTitulo(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') criar(req.sugeridas?.[0] ?? null) }} />
       </label>
-      <h3 className="mb-2">Usar predefinição</h3>
+      <h3 className="mb-2">Tipo</h3>
       {ordenadas.length === 0 && <p className="meta mb-3">Nenhuma predefinição salva ainda. Crie um note zerado e use "Salvar como predefinição".</p>}
       <ul className="flex flex-col gap-1 mb-4">
         {ordenadas.map((p) => (
@@ -43,7 +43,7 @@ export function CriarNoteModal({ req }: { req: NonNullable<ReturnType<typeof use
       </ul>
       <div className="borda-t pt-4">
         <button className="btn w-full justify-start" onClick={() => criar(null)}>
-          Zerado <span className="meta text-ui-sm">sem campos, só o notepad</span>
+          Sem tipo <span className="meta text-ui-sm">ficha vazia, só a história</span>
         </button>
       </div>
     </Modal>

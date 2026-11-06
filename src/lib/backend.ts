@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { PK, type TableName, type Row } from './types'
+import { COM_LIXEIRA, PK, type TableName, type Row } from './types'
 import { SEED, SEED_USER_ID } from './seedData.ts'
 
 /**
@@ -21,6 +21,8 @@ export interface Backend {
   uploadImage(workspaceId: string, file: Blob): Promise<string>
   imageUrl(path: string): Promise<string>
   userId(): string | null
+  /** apaga de vez a lixeira com mais de 30 dias */
+  limparLixeira(): Promise<void>
 }
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -79,6 +81,10 @@ export function supabaseBackend(sb: SupabaseClient): Backend {
       return r.data.signedUrl
     },
     userId: () => currentUserId,
+    async limparLixeira() {
+      // sem a migration v1.1 a função não existe: não é motivo para avisar erro
+      await sb.rpc('limpar_lixeira').then(() => undefined, () => undefined)
+    },
   }
 }
 
@@ -96,7 +102,7 @@ const CASCADE: Partial<Record<TableName, [TableName, string, 'delete' | 'null'][
   predef_abas: [['predef_campos', 'aba_id', 'delete']],
   gaveteiros: [['pastas', 'gaveteiro_id', 'delete']],
   pastas: [['note_pasta', 'pasta_id', 'delete']],
-  quadros: [['quadro_posicoes', 'quadro_id', 'delete'], ['quadro_conexoes_ocultas', 'quadro_id', 'delete']],
+  quadros: [['quadro_posicoes', 'quadro_id', 'delete'], ['quadro_conexoes_ocultas', 'quadro_id', 'delete'], ['conexoes', 'quadro_id', 'null']],
   conexoes: [['quadro_conexoes_ocultas', 'conexao_id', 'delete']],
   timelines: [['trilhas', 'timeline_id', 'delete'], ['eventos_timeline', 'timeline_id', 'delete']],
   trilhas: [['eventos_timeline', 'trilha_id', 'delete']],
@@ -104,12 +110,12 @@ const CASCADE: Partial<Record<TableName, [TableName, string, 'delete' | 'null'][
 }
 
 const DEFAULTS: Partial<Record<TableName, Record<string, unknown>>> = {
-  notes: { predefinicao_id: null, titulo: 'Sem título', titulo_provisorio: true, resumo: '', resumo_provisorio: true, corpo_json: null },
+  notes: { predefinicao_id: null, titulo: 'Sem título', titulo_provisorio: true, titulo_ligado: true, deleted_at: null, resumo: '', resumo_provisorio: true, corpo_json: null },
   pastas: { cor: null, origem: 'manual', regra_campo_id: null, regra_valor_note_id: null, regra_valor_texto: null },
   gaveteiros: { cor: '#2F363B', icone: '▤', capa_url: null, ordem: 0 },
   note_campos: { config_json: {}, ordem: 0, organiza_pasta: false },
   predef_campos: { config_json: {}, ordem: 0, organiza_pasta: false },
-  conexoes: { rotulo: '', tipo: 'manual', campo_id: null },
+  conexoes: { rotulo: '', tipo: 'manual', campo_id: null, quadro_id: null },
   trilhas: { cor: null, ordem: 0, note_id: null, recolhida: false },
   eventos_timeline: { fim_json: null, expandido: false },
   quadro_posicoes: { oculto: false },
@@ -184,6 +190,17 @@ export function localBackend(): Backend {
     },
     async imageUrl(path) { return path },
     userId: () => SEED_USER_ID,
+    async limparLixeira() {
+      const limite = Date.now() - 30 * 864e5
+      for (const table of COM_LIXEIRA) {
+        const rows = t(table) as any[]
+        const gone = rows.filter((r) => r.deleted_at && Date.parse(r.deleted_at) < limite)
+        if (!gone.length) continue
+        db[table] = rows.filter((r) => !gone.includes(r)) as any
+        cascade(table, gone)
+      }
+      save()
+    },
   }
 }
 

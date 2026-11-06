@@ -2,8 +2,9 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { IconFechar } from './Icons'
 
-export function Modal({ titulo, onFechar, children, largura = 480 }: {
-  titulo: string; onFechar: () => void; children: ReactNode; largura?: number
+export function Modal({ titulo, rotulo, onFechar, children, largura = 480 }: {
+  titulo: ReactNode; /** nome acessível quando o título não é texto puro */ rotulo?: string
+  onFechar: () => void; children: ReactNode; largura?: number
 }) {
   const ref = useRef<HTMLDivElement>(null)
   // onFechar costuma ser inline; guardar em ref evita refazer o foco a cada render
@@ -30,10 +31,10 @@ export function Modal({ titulo, onFechar, children, largura = 480 }: {
 
   // portal: painéis com transform (animação de entrada) prenderiam o position:fixed
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4" style={{ background: 'rgb(34 39 43 / .7)', paddingTop: '12vh' }}
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-4" style={{ background: 'rgb(30 35 38 / .75)', paddingTop: '12vh' }}
       onMouseDown={(e) => { if (e.target === e.currentTarget) onFechar() }}>
-      <div ref={ref} role="dialog" aria-modal="true" aria-label={titulo}
-        className="elev rounded-painel borda w-full flex flex-col" style={{ maxWidth: largura, maxHeight: '76vh' }}>
+      <div ref={ref} role="dialog" aria-modal="true" aria-label={rotulo ?? (typeof titulo === 'string' ? titulo : undefined)}
+        className="elev rounded-painel borda w-full flex flex-col shadow-levantado" style={{ maxWidth: largura, maxHeight: '76vh' }}>
         <div className="flex items-center justify-between px-4 py-3 borda-b">
           <h2 className="text-ui-lg font-semibold">{titulo}</h2>
           <button data-fechar className="btn-icone" onClick={onFechar} aria-label="Fechar"><IconFechar /></button>

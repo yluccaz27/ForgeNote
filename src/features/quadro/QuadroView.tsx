@@ -7,8 +7,10 @@ import {
 import dagre from '@dagrejs/dagre'
 import { uid, useTable, useWsTable, write, cache } from '../../lib/data'
 import { useMiniaturas } from '../../lib/hooks'
-import { toast, useUI } from '../../store/ui'
-import { digitando } from '../../components/Shell'
+import { toast, toastDesfazer, useUI } from '../../store/ui'
+import { dica, digitando, useAtalho } from '../../lib/shortcuts'
+import { MenuMais } from '../../components/Menu'
+import { ExcluirQuadroDialogo } from './ExcluirQuadro'
 import { NoteEditor } from '../note/NoteEditor'
 import { IconFechar } from '../../components/Icons'
 import { FiltroModal } from './QuadroList'
@@ -40,6 +42,7 @@ function Quadro() {
   const [foco, setFoco] = useState<string | null>(params.get('foco'))
   const [mostrarOcultas, setMostrarOcultas] = useState(false)
   const [filtro, setFiltro] = useState(false)
+  const [excluir, setExcluir] = useState(false)
   const [arrastando, setArrastando] = useState<string | null>(null)
   const [selNode, setSelNode] = useState<string | null>(null)
   const conhecidas = useRef<Set<string> | null>(null)
@@ -101,7 +104,7 @@ function Quadro() {
       toast('Conexão ocultada neste quadro.', { rotulo: 'Desfazer', fn: () => write.remove('quadro_conexoes_ocultas', { quadro_id: id, conexao_id: c.id }) })
     } else {
       write.remove('conexoes', { id: c.id })
-      toast('Linha apagada.', { rotulo: 'Desfazer', fn: () => write.insert('conexoes', [c]) })
+      toastDesfazer('Linha excluída.', () => write.insert('conexoes', [c]))
     }
   }, [id, ocultasSet])
 
@@ -137,9 +140,10 @@ function Quadro() {
 
   const onConnect = useCallback((c: Connection) => {
     if (!c.source || !c.target || c.source === c.target) return
-    write.insert('conexoes', [{ id: uid(), origem_note_id: c.source, destino_note_id: c.target, rotulo: '', tipo: 'manual', campo_id: null }])
+    // a conexão manual lembra o quadro onde foi puxada (para excluir junto com ele)
+    write.insert('conexoes', [{ id: uid(), origem_note_id: c.source, destino_note_id: c.target, rotulo: '', tipo: 'manual', campo_id: null, quadro_id: id ?? null }])
     toast('Linha criada. Dê duplo clique no rótulo para nomear.')
-  }, [])
+  }, [id])
 
   const onEdgeClick: EdgeMouseHandler<FioEdgeT> = useCallback(() => {}, [])
 
@@ -164,7 +168,6 @@ function Quadro() {
     if (digitando(e.nativeEvent)) return
     const el = (e.target as HTMLElement).closest('.react-flow__node') as HTMLElement | null
     const nid = el?.dataset.id ?? selNode
-    if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey) { e.preventDefault(); setFoco((f) => (f ? null : nid ?? null)); return }
     if (e.key === 'Escape') { if (painelNote) setPainelNote(null); else setFoco(null); return }
     if (!el || !nid) return
     if (e.key === 'Enter') { e.preventDefault(); setPainelNote(nid); return }
@@ -182,6 +185,12 @@ function Quadro() {
     if (f) { setFoco(f); setTimeout(() => rf.fitView({ nodes: [{ id: f }], maxZoom: 1.2, padding: 1 }), 100) }
   }, [params, rf])
   useEffect(() => () => setPainelNote(null), [setPainelNote])
+  // F: foco no papel com o foco do teclado, ou no selecionado
+  useAtalho('quadro.foco', () => {
+    const el = (document.activeElement as HTMLElement | null)?.closest('.react-flow__node') as HTMLElement | null
+    const nid = el?.dataset.id ?? selNode
+    setFoco((f) => (f ? null : nid ?? null))
+  })
 
   if (!quadro) return <p className="p-6 meta">Quadro não encontrado. <Link to="/quadro" className="underline">Voltar aos quadros</Link></p>
   const vazio = !(quadro.filtro_json.gaveteiros?.length || quadro.filtro_json.pastas?.length)
@@ -191,8 +200,10 @@ function Quadro() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex flex-wrap items-center gap-2 px-4 py-2 borda-b">
-        <input key={quadro.nome} className="bg-transparent text-ui-lg font-semibold" style={{ border: 0, minWidth: 0 }} defaultValue={quadro.nome} aria-label="Nome do quadro"
+        <input key={quadro.nome} className="bg-transparent font-texto text-ui-lg font-semibold" style={{ border: 0, minWidth: 0 }} defaultValue={quadro.nome} aria-label="Nome do quadro"
           onBlur={(e) => e.target.value.trim() && e.target.value !== quadro.nome && write.update('quadros', { id: quadro.id }, { nome: e.target.value.trim() })} />
+        <MenuMais rotulo={`Opções do quadro ${quadro.nome}`} alinhar="esquerda"
+          excluir={() => setExcluir(true)} />
         <span className="meta text-ui-sm" aria-live="polite">{soltos === 0 ? 'Todos os notes estão ligados' : `${soltos} ${soltos === 1 ? 'note sem conexão' : 'notes sem conexão'}`}</span>
         <div className="flex-1" />
         <button className="btn" onClick={() => setFiltro(true)}>Escolher pastas</button>
@@ -201,11 +212,11 @@ function Quadro() {
           <button className="btn" onClick={() => write.update('quadro_posicoes', { quadro_id: quadro.id, oculto: true }, { oculto: false })}>Trazer de volta {foraDoQuadro} {foraDoQuadro === 1 ? 'papel' : 'papéis'}</button>
         )}
         <button className="btn" onClick={organizar} disabled={!visiveis.length}>Organizar automaticamente</button>
-        <button className="btn" aria-pressed={!!foco} onClick={() => setFoco((f) => (f ? null : selNode))} disabled={!foco && !selNode} title="Atalho: F">{foco ? 'Sair do foco' : 'Focar'}</button>
+        <button className="btn" aria-pressed={!!foco} onClick={() => setFoco((f) => (f ? null : selNode))} disabled={!foco && !selNode} title={dica('quadro.foco', foco ? 'Sair do foco' : 'Focar')}>{foco ? 'Sair do foco' : 'Focar'}</button>
       </div>
 
       <div className="flex-1 min-h-0 flex">
-        <div className="flex-1 min-w-0 relative mesa-pontos" onKeyDown={onKeyDown}>
+        <div className="flex-1 min-w-0 relative mesa-quadro" onKeyDown={onKeyDown}>
           {vazio ? (
             <div className="h-full flex flex-col items-center justify-center gap-3">
               <p>Escolha as pastas que entram neste quadro.</p>
@@ -244,11 +255,12 @@ function Quadro() {
               <div className="flex-1" />
               <button className="btn-icone" aria-label="Fechar painel" onClick={() => setPainelNote(null)}><IconFechar /></button>
             </div>
-            {cache('notes').some((n) => n.id === painelNote) && <NoteEditor key={painelNote} noteId={painelNote} compacto />}
+            {cache('notes').some((n) => n.id === painelNote) && <NoteEditor key={painelNote} noteId={painelNote} compacto onExcluido={() => setPainelNote(null)} />}
           </aside>
         )}
       </div>
 
+      {excluir && <ExcluirQuadroDialogo quadro={quadro} onFechar={() => setExcluir(false)} onExcluido={() => nav('/quadro')} />}
       {filtro && (
         <FiltroModal titulo="Pastas deste quadro" inicial={quadro.filtro_json} onFechar={() => setFiltro(false)}
           onSalvar={(f) => { write.update('quadros', { id: quadro.id }, { filtro_json: f }); setFiltro(false); toast('Pastas salvas') }} />

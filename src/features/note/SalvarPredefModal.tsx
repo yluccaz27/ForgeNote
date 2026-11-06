@@ -32,7 +32,7 @@ export function SalvarPredefModal({ noteId, onFechar }: { noteId: string; onFech
           <div className="flex flex-wrap gap-1">
             {ICONES.map((i) => (
               <button type="button" key={i} aria-pressed={icone === i} aria-label={`Ícone ${i}`}
-                className={`btn-icone ${icone === i ? 'item-ativo bg-ardosia' : ''}`} onClick={() => setIcone(i)}>{i}</button>
+                className={`btn-icone ${icone === i ? 'item-ativo bg-mesa' : ''}`} onClick={() => setIcone(i)}>{i}</button>
             ))}
           </div>
         </fieldset>
@@ -52,7 +52,7 @@ export function SalvarPredefModal({ noteId, onFechar }: { noteId: string; onFech
               </div>
             )}
         </fieldset>
-        <p className="meta text-ui-sm">Campos e abas são copiados. Valores não entram na predefinição.</p>
+        <p className="meta text-ui-sm">Seções e campos são copiados. O que foi preenchido não entra na predefinição.</p>
         <div className="flex justify-end gap-2">
           <button type="button" className="btn" onClick={onFechar}>Cancelar</button>
           <button className="btn-primario">Salvar predefinição</button>

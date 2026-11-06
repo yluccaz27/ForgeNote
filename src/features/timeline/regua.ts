@@ -53,7 +53,7 @@ export function calcularRegua(cal: CalendarioConfig, inicio: number, escala: num
   return { nivel: k >= 100 ? 'era' : 'ano', menores, maiores }
 }
 
-/** "Era do Selo ▸ 340" no canto da régua, para o ponto à esquerda. */
+/** "Era da Ponte ▸ 340" no canto da régua, para o ponto à esquerda. */
 export function contexto(cal: CalendarioConfig, dia: number) {
   const p = partesDeDia(cal, dia)
   const { era, ano } = anoNaEra(cal, p.ano)

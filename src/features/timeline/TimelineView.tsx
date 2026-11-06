@@ -6,7 +6,12 @@ import { diasNoAno, formatarDia, formatarIntervalo } from '../../lib/calendar'
 import { useCalendario } from '../../lib/hooks'
 import { corMarcacao } from '../../lib/color'
 import { toast, useUI } from '../../store/ui'
-import { digitando } from '../../components/Shell'
+import { textoAtalho, useAtalho } from '../../lib/shortcuts'
+import { reduzMovimento } from '../../lib/hooks'
+import { excluirEvento, excluirTrilha } from '../../lib/excluir'
+import { MenuMais } from '../../components/Menu'
+import { ConfirmarExclusao } from '../../components/ConfirmarExclusao'
+import { ExcluirTimelineDialogo } from './Excluir'
 import { Notepad } from '../../components/Notepad'
 import { Modal } from '../../components/Modal'
 import { IconArrastar, IconFechar, IconMais, IconSeta } from '../../components/Icons'
@@ -49,8 +54,13 @@ export function TimelineView() {
   const nav = useNavigate()
 
   const trilhas = useMemo(() => todasTrilhas.filter((t) => t.timeline_id === id).sort((a, b) => a.ordem - b.ordem), [todasTrilhas, id])
-  const eventos = useMemo(() => todosEventos.filter((e) => e.timeline_id === id), [todosEventos, id])
   const noteMap = useMemo(() => new Map(notes.map((n) => [n.id, n])), [notes])
+  // eventos de trilhas ou notes na lixeira ficam de fora
+  const eventos = useMemo(() => {
+    const tr = new Set(trilhas.map((t) => t.id))
+    return todosEventos.filter((e) => e.timeline_id === id && tr.has(e.trilha_id) && noteMap.has(e.note_id))
+  }, [todosEventos, id, trilhas, noteMap])
+  const [exTl, setExTl] = useState(false)
 
   const area = useRef<HTMLDivElement>(null)
   const [largura, setLargura] = useState(800)
@@ -196,16 +206,15 @@ export function TimelineView() {
   }
   const recolherTudo = () => { if (eventos.some((e) => e.expandido)) write.update('eventos_timeline', { timeline_id: id!, expandido: true }, { expandido: false }) }
 
+  // Esc recolhe o evento aberto (tratado aqui: vale também de dentro do editor)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !document.querySelector('[role="dialog"]')) { recolherTudo(); (document.activeElement as HTMLElement | null)?.blur?.() }
-      if (digitando(e)) return
-      if ((e.key === '+' || e.key === '=') && e.ctrlKey === false) zoom(1.4, largura / 2)
-      if (e.key === '-' && e.ctrlKey === false) zoom(1 / 1.4, largura / 2)
+      if (e.key === 'Escape' && !document.querySelector('[role="dialog"], [role="menu"]')) { recolherTudo(); (document.activeElement as HTMLElement | null)?.blur?.() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
+  useAtalho('timeline.zoomTeclas', (_, combo) => zoom(combo === '-' ? 1 / 1.4 : 1.4, largura / 2))
 
   // destaque cruzado
   const participa = useCallback((ev: EventoTimeline, pid: string) =>
@@ -249,8 +258,9 @@ export function TimelineView() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex flex-wrap items-center gap-2 px-4 py-2 borda-b">
-        <input key={tl.nome} className="bg-transparent text-ui-lg font-semibold" style={{ border: 0, minWidth: 0 }} defaultValue={tl.nome} aria-label="Nome da timeline"
+        <input key={tl.nome} className="bg-transparent font-texto text-ui-lg font-semibold" style={{ border: 0, minWidth: 0 }} defaultValue={tl.nome} aria-label="Nome da timeline"
           onBlur={(e) => e.target.value.trim() && e.target.value !== tl.nome && write.update('timelines', { id: tl.id }, { nome: e.target.value.trim() })} />
+        <MenuMais rotulo={`Opções da timeline ${tl.nome}`} alinhar="esquerda" excluir={() => setExTl(true)} />
         <div className="flex-1" />
         <label className="flex items-center gap-2"><span className="meta">Destacar</span>
           <select className="campo" style={{ width: 'auto' }} value={destaque ?? ''} onChange={(e) => setDestaque(e.target.value || null)}>
@@ -260,8 +270,8 @@ export function TimelineView() {
         </label>
         {destaque && <button className="btn" onClick={() => verNoQuadro(destaque)}>Ver no quadro</button>}
         <div className="flex">
-          <button className="btn-icone" aria-label="Afastar" title="Afastar (Ctrl+scroll)" onClick={() => zoom(1 / 1.6, largura / 2)}>−</button>
-          <button className="btn-icone" aria-label="Aproximar" title="Aproximar (Ctrl+scroll)" onClick={() => zoom(1.6, largura / 2)}>+</button>
+          <button className="btn-icone" aria-label="Afastar" title={`Afastar (−, ou ${textoAtalho('timeline.zoom')})`} onClick={() => zoom(1 / 1.6, largura / 2)}>−</button>
+          <button className="btn-icone" aria-label="Aproximar" title={`Aproximar (+, ou ${textoAtalho('timeline.zoom')})`} onClick={() => zoom(1.6, largura / 2)}>+</button>
         </div>
         <button className="btn" onClick={ajustar}>Ajustar à história</button>
         {calRow && <button className="btn" onClick={() => setCalAberto(true)}>Calendário</button>}
@@ -271,7 +281,7 @@ export function TimelineView() {
 
       <div ref={area} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative select-none" role="region" aria-label={`Timeline ${tl.nome}`}>
         {/* régua */}
-        <div className="flex sticky top-0 z-10 bg-ardosia borda-b">
+        <div className="flex sticky top-0 z-10 bg-mesa borda-b">
           <div className="shrink-0 px-3 flex items-end pb-1 text-ui-sm meta" style={{ width: COL }}>{vista ? contexto(cal, vista.inicio) : ''}</div>
           <div className="relative flex-1 overflow-hidden" style={{ height: 72, cursor: gesto?.tipo === 'pan' ? 'grabbing' : 'grab' }}
             onPointerDown={(e) => vista && setGesto({ tipo: 'pan', x0: e.clientX, inicio0: vista.inicio })}>
@@ -280,7 +290,7 @@ export function TimelineView() {
                 {regua.maiores.map((t) => x(t.dia) > -200 && x(t.dia) < largura && (
                   <g key={`M${t.dia}`}>
                     <line x1={x(t.dia)} x2={x(t.dia)} y1={0} y2={44} stroke="var(--liquen)" strokeOpacity={0.5} />
-                    <text x={x(t.dia) + 4} y={14} fill="var(--osso)" fontSize={12.5} fontFamily="Instrument Sans">{t.rotulo}</text>
+                    <text x={x(t.dia) + 4} y={14} fill="var(--papel)" fontSize={12.5} fontFamily="Instrument Sans">{t.rotulo}</text>
                   </g>
                 ))}
                 {regua.menores.map((t) => x(t.dia) >= -60 && x(t.dia) <= largura && (
@@ -337,6 +347,7 @@ export function TimelineView() {
       </div>
 
       {calAberto && calRow && <CalendarioModal cal={calRow} onFechar={() => setCalAberto(false)} />}
+      {exTl && <ExcluirTimelineDialogo tl={tl} onFechar={() => setExTl(false)} onExcluido={() => nav('/timeline')} />}
       {novaTrilha && <NovaTrilhaModal modo={novaTrilha} timelineId={tl.id} ordem={trilhas.length} onFechar={() => setNovaTrilha(null)} />}
     </div>
   )
@@ -353,6 +364,8 @@ function TrilhaLinha(p: {
 }) {
   const { trilha: t, x, cal } = p
   const [renomear, setRenomear] = useState(false)
+  const [excluir, setExcluir] = useState(false)
+  const nav = useNavigate()
   const expandido = p.eventos.find((e) => e.expandido)
   const altura = t.recolhida ? ALT_RECOLHIDA : ALT_TRILHA + (expandido ? ALT_CORPO : 0)
   const linhaY = t.recolhida ? ALT_RECOLHIDA / 2 : LINHA_Y
@@ -362,7 +375,7 @@ function TrilhaLinha(p: {
   const temVida = vidaDias.length >= 2
 
   return (
-    <div className={`flex borda-b ${p.par ? 'elev' : 'bg-ardosia'}`} style={{ height: altura, transition: 'height 180ms ease-out', opacity: p.arrastando === t.id ? 0.6 : 1 }}
+    <div className={`flex borda-b ${p.par ? 'elev' : 'bg-mesa'}`} style={{ height: altura, transition: 'height 180ms ease-out', opacity: p.arrastando === t.id ? 0.6 : 1 }}
       onDragOver={(e) => { if (p.arrastando) e.preventDefault() }} onDrop={() => p.soltarEm(t.id)}>
       {/* nome da trilha, fixo à esquerda */}
       <div className="shrink-0 flex items-start gap-1 px-2 borda-r" style={{ width: COL, paddingTop: t.recolhida ? 0 : 8, alignItems: t.recolhida ? 'center' : 'flex-start', borderLeft: `3px solid ${marca}` }}>
@@ -378,15 +391,22 @@ function TrilhaLinha(p: {
               onClick={() => noteTrilha && useUI.getState().setDestaque(noteTrilha.id)}>{t.nome}</button>
           )}
           {!t.recolhida && (
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1">
+              <MenuMais rotulo={`Opções da trilha ${t.nome}`} alinhar="esquerda"
+                itens={[
+                  { rotulo: 'Renomear trilha', onClick: () => setRenomear(true) },
+                  noteTrilha && { rotulo: 'Abrir note', onClick: () => nav(`/note/${noteTrilha.id}`) },
+                ]}
+                excluir={() => setExcluir(true)} />
               {noteTrilha && <Link className="meta text-ui-sm" to={`/note/${noteTrilha.id}`}>Abrir note</Link>}
-              <button className="meta text-ui-sm" aria-label={`Excluir trilha ${t.nome}`} onClick={() => {
-                if (p.eventos.length && !confirm(`Excluir a trilha "${t.nome}" e tirar ${p.eventos.length} eventos da timeline? Os notes continuam.`)) return
-                write.remove('trilhas', { id: t.id })
-              }}>Excluir</button>
             </div>
           )}
         </div>
+        {excluir && (
+          <ConfirmarExclusao oque="a trilha" nome={t.nome} acao="Excluir trilha" onFechar={() => setExcluir(false)} onExcluir={() => excluirTrilha(t.id)}>
+            <p>{p.eventos.length ? `${p.eventos.length === 1 ? 'O evento dela sai' : `Os ${p.eventos.length} eventos dela saem`} da timeline.` : 'A trilha não tem eventos.'} Os notes continuam existindo.</p>
+          </ConfirmarExclusao>
+        )}
         <button className="btn-icone meta" aria-label={t.recolhida ? `Expandir trilha ${t.nome}` : `Recolher trilha ${t.nome}`} aria-expanded={!t.recolhida}
           onClick={() => write.update('trilhas', { id: t.id }, { recolhida: !t.recolhida })}>
           <IconSeta width={14} height={14} style={{ transform: t.recolhida ? 'rotate(-90deg)' : undefined }} />
@@ -399,21 +419,21 @@ function TrilhaLinha(p: {
         <svg width={p.largura} height={altura} className="absolute inset-0" style={{ pointerEvents: 'none' }} aria-hidden>
           {temVida && (
             <rect x={x(Math.min(...vidaDias))} y={linhaY - 5} width={Math.max(2, x(Math.max(...vidaDias)) - x(Math.min(...vidaDias)))} height={10}
-              fill="var(--osso)" fillOpacity={0.12} rx={2}><title>Vida de {t.nome}</title></rect>
+              fill="var(--papel)" fillOpacity={0.12} rx={2}><title>Vida de {t.nome}</title></rect>
           )}
           {/* o fio do tempo */}
-          <line x1={0} x2={p.largura} y1={linhaY} y2={linhaY} stroke="var(--lacre)" strokeWidth={2} />
+          <line x1={0} x2={p.largura} y1={linhaY} y2={linhaY} stroke="var(--verdete)" strokeWidth={2} />
           {p.gesto?.tipo === 'criar' && p.gesto.trilha === t.id && (
             Math.abs(p.gesto.x1 - p.gesto.x0) > 6
-              ? <rect x={Math.min(p.gesto.x0, p.gesto.x1)} y={linhaY - 12} width={Math.abs(p.gesto.x1 - p.gesto.x0)} height={24} fill="var(--osso)" fillOpacity={0.4} rx={2} />
-              : <circle cx={p.gesto.x0} cy={linhaY} r={6} fill="var(--osso)" fillOpacity={0.5} />
+              ? <rect x={Math.min(p.gesto.x0, p.gesto.x1)} y={linhaY - 12} width={Math.abs(p.gesto.x1 - p.gesto.x0)} height={24} fill="var(--papel)" fillOpacity={0.4} rx={2} />
+              : <circle cx={p.gesto.x0} cy={linhaY} r={6} fill="var(--papel)" fillOpacity={0.5} />
           )}
         </svg>
 
         {/* marcos de data do note da trilha */}
         {p.marcos.map((m) => (
           <div key={m.campo} className="absolute" style={{ left: x(m.dia) - 6, top: linhaY - 6 }} title={`${m.campo}: ${formatarDia(cal, m.dia)}`}>
-            <svg width={12} height={12} aria-hidden><circle cx={6} cy={6} r={5} fill="var(--ardosia)" stroke="var(--lacre)" strokeWidth={2} /></svg>
+            <svg width={12} height={12} aria-hidden><circle cx={6} cy={6} r={5} fill="var(--mesa)" stroke="var(--verdete)" strokeWidth={2} /></svg>
             {!t.recolhida && <span className="absolute text-ui-sm meta whitespace-nowrap" style={{ top: 16, left: -2 }}>{m.campo}</span>}
           </div>
         ))}
@@ -422,8 +442,10 @@ function TrilhaLinha(p: {
           const note = p.noteMap.get(ev.note_id)
           if (!note) return null
           // eventos muito próximos: só o marcador, para os rótulos não se atropelarem
-          const vizinho = ordenados[idx + 1]
-          const apertado = !!vizinho && x(vizinho.inicio_json.dia) - x(ev.inicio_json.dia) < 150 && !ev.expandido
+          const vizinho = ordenados[idx + 1], anterior = ordenados[idx - 1]
+          const apertado = !ev.expandido && (
+            (!!vizinho && x(vizinho.inicio_json.dia) - x(ev.inicio_json.dia) < 150)
+            || (!!anterior && x(ev.inicio_json.dia) - x(anterior.inicio_json.dia) < 150))
           const g = p.gesto && 'ev' in p.gesto && p.gesto.ev === ev.id ? p.gesto : null
           const [ini, fim] = g ? p.aplicar(g, Math.round(g.dx / p.escala)) : [ev.inicio_json.dia, ev.fim_json?.dia ?? null]
           const x1 = x(ini), x2 = fim != null ? x(fim) : x1
@@ -438,16 +460,16 @@ function TrilhaLinha(p: {
           return (
             <div key={ev.id} style={{ opacity: dim ? 0.25 : 1 }}>
               {!t.recolhida && !apertado && (
-                <span className="absolute text-ui-sm whitespace-nowrap px-1 rounded-campo borda" style={{ left: x1 - 4, top: 8, background: 'var(--ardosia)' }}>{formatarDia(cal, ini)}</span>
+                <span className="absolute carimbo" style={{ left: x1 - 4, top: 6, ['--giro' as string]: `${giroDe(ev.id)}deg` }}>{formatarDia(cal, ini)}</span>
               )}
               {fim == null ? (
                 <button className="absolute" style={{ left: x1 - 8, top: linhaY - 8, width: 16, height: 16, cursor: 'grab' }}
                   aria-label={`${note.titulo}, ${rotuloData}. Enter abre a descrição.`} aria-expanded={ev.expandido}
                   onPointerDown={comecar('mover')} onKeyDown={(e) => teclaEvento(e, ev, p.alternar)}>
-                  <svg width={16} height={16} aria-hidden><circle cx={8} cy={8} r={6} fill="var(--lacre)" stroke={real || ev.expandido ? 'var(--osso)' : 'var(--ardosia)'} strokeWidth={2} /></svg>
+                  <svg width={16} height={16} aria-hidden><circle cx={8} cy={8} r={6} fill="var(--verdete)" stroke={real || ev.expandido ? 'var(--papel)' : 'var(--mesa)'} strokeWidth={2} /></svg>
                 </button>
               ) : (
-                <div className="absolute papel flex items-center" style={{ left: x1, top: linhaY - 12, width: Math.max(8, x2 - x1), height: 24, borderLeftWidth: 0, outline: real || ev.expandido ? '2px solid var(--osso)' : undefined }}>
+                <div className="absolute papel flex items-center" style={{ left: x1, top: linhaY - 12, width: Math.max(8, x2 - x1), height: 24, borderLeftWidth: 0, outline: real || ev.expandido ? '2px solid var(--papel)' : undefined }}>
                   <span className="absolute h-full" style={{ left: 0, width: 8, cursor: 'ew-resize' }} onPointerDown={comecar('ini')} aria-hidden />
                   <button className="flex-1 h-full px-2 text-left truncate font-texto text-titulo-papel" style={{ cursor: 'grab', minWidth: 0 }}
                     aria-label={`${note.titulo}, ${rotuloData}. Enter abre a descrição.`} aria-expanded={ev.expandido}
@@ -468,6 +490,13 @@ function TrilhaLinha(p: {
   )
 }
 
+/** Rotação fixa do carimbo de cada evento, entre −1° e 1°. */
+function giroDe(id: string) {
+  let h = 0
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  return ((h % 201) - 100) / 100
+}
+
 function teclaEvento(e: React.KeyboardEvent, ev: EventoTimeline, alternar: (ev: EventoTimeline) => void) {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(ev); return }
   const d = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0
@@ -481,6 +510,8 @@ function teclaEvento(e: React.KeyboardEvent, ev: EventoTimeline, alternar: (ev: 
 /** Expandido: abaixo da linha, a descrição editável (o notepad do note). */
 function CorpoEvento({ ev, note, left, top, cal, onRecolher }: { ev: EventoTimeline; note: Note; left: number; top: number; cal: CalendarioConfig; onRecolher: () => void }) {
   const [aberto, setAberto] = useState(false)
+  const [pronto, setPronto] = useState(false)
+  const [excluir, setExcluir] = useState(false)
   const nav = useNavigate()
   useEffect(() => { const r = requestAnimationFrame(() => setAberto(true)); return () => cancelAnimationFrame(r) }, [])
   const participantes = (() => {
@@ -491,8 +522,10 @@ function CorpoEvento({ ev, note, left, top, cal, onRecolher }: { ev: EventoTimel
   })()
   return (
     <div className="absolute elev borda rounded-painel" onPointerDown={(e) => e.stopPropagation()}
-      style={{ left, top, width: 380, display: 'grid', gridTemplateRows: aberto ? '1fr' : '0fr', transition: 'grid-template-rows 180ms ease-out', cursor: 'auto' }}>
-      <div className="overflow-hidden">
+      style={{ left, top, width: 380, display: 'grid', gridTemplateRows: aberto ? '1fr' : '0fr', transition: 'grid-template-rows 180ms ease-out', cursor: 'auto' }}
+      onTransitionEnd={() => setPronto(true)}>
+      {/* depois de abrir, deixa o menu ⋯ sair da caixa */}
+      <div style={{ overflow: pronto || reduzMovimento() ? 'visible' : 'hidden', minHeight: 0 }}>
         <div className="p-3 flex flex-col gap-2" style={{ maxHeight: ALT_CORPO - 52, overflowY: 'auto' }}>
           <input key={note.titulo} className={`bg-transparent font-texto text-titulo-papel ${note.titulo_provisorio ? 'italic' : ''}`} style={{ border: 0 }}
             defaultValue={note.titulo_provisorio ? '' : note.titulo} placeholder={note.titulo} aria-label="Título do evento"
@@ -509,11 +542,16 @@ function CorpoEvento({ ev, note, left, top, cal, onRecolher }: { ev: EventoTimel
         </div>
         <div className="flex gap-2 px-3 py-2 borda-t">
           <button className="btn" onClick={() => nav(`/note/${note.id}`)}>Abrir note</button>
-          <button className="btn" onClick={() => { write.remove('eventos_timeline', { id: ev.id }); toast('Evento tirado da timeline. O note continua.') }}>Tirar da timeline</button>
+          <MenuMais rotulo={`Opções do evento ${note.titulo}`} alinhar="esquerda" acima excluir={() => setExcluir(true)} />
           <div className="flex-1" />
           <button className="btn-icone" aria-label="Recolher evento" title={`Recolher (Esc). ${formatarDia(cal, ev.inicio_json.dia)}`} onClick={onRecolher}><IconFechar width={16} height={16} /></button>
         </div>
       </div>
+      {excluir && (
+        <ConfirmarExclusao oque="o evento" nome={note.titulo} acao="Excluir evento" onFechar={() => setExcluir(false)} onExcluir={() => excluirEvento(ev.id)}>
+          <p>Sai só a marcação nesta timeline. O note do evento continua existindo, com a ficha e a história.</p>
+        </ConfirmarExclusao>
+      )}
     </div>
   )
 }
@@ -534,7 +572,7 @@ function NovaTrilhaModal({ modo, timelineId, ordem, onFechar }: { modo: 'livre' 
         <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); if (nome.trim()) criar(nome.trim(), null, cor) }}>
           <label className="flex flex-col gap-1"><span>Nome</span><input className="campo" required value={nome} onChange={(e) => setNome(e.target.value)} /></label>
           <fieldset><legend className="mb-1">Cor</legend>
-            <div className="flex gap-2">{CORES.map((c) => <button type="button" key={c} aria-label={`Cor ${c}`} aria-pressed={cor === c} onClick={() => setCor(c)} className="rounded-campo" style={{ width: 32, height: 32, background: c, border: cor === c ? '2px solid var(--osso)' : '1px solid var(--borda)' }} />)}</div>
+            <div className="flex gap-2">{CORES.map((c) => <button type="button" key={c} aria-label={`Cor ${c}`} aria-pressed={cor === c} onClick={() => setCor(c)} className="rounded-campo" style={{ width: 32, height: 32, background: c, border: cor === c ? '2px solid var(--papel)' : '1px solid var(--borda)' }} />)}</div>
           </fieldset>
           <div className="flex justify-end gap-2"><button type="button" className="btn" onClick={onFechar}>Cancelar</button><button className="btn-primario">Criar trilha</button></div>
         </form>

@@ -4,11 +4,14 @@ import { uid, useTable, useWsTable, write } from '../../lib/data'
 import { useUI, toast } from '../../store/ui'
 import { Modal } from '../../components/Modal'
 import { IconMais } from '../../components/Icons'
+import { MenuMais } from '../../components/Menu'
+import { ExcluirQuadroDialogo } from './ExcluirQuadro'
 import type { Quadro } from '../../lib/types'
 
 export function QuadroList() {
   const quadros = useWsTable('quadros')
   const [novo, setNovo] = useState(false)
+  const [excluir, setExcluir] = useState<Quadro | null>(null)
   const nav = useNavigate()
   const ws = useUI((s) => s.wsId)!
   return (
@@ -21,9 +24,13 @@ export function QuadroList() {
       {quadros.length === 0 && <p className="mb-4">Um quadro mostra os notes de algumas pastas como papéis numa mesa, ligados por fios. Crie o primeiro.</p>}
       <ul className="flex flex-col gap-2" style={{ maxWidth: 640 }}>
         {quadros.map((q) => (
-          <li key={q.id}><Link to={`/quadro/${q.id}`} className="btn w-full justify-start">{q.nome}</Link></li>
+          <li key={q.id} className="flex items-center gap-1">
+            <Link to={`/quadro/${q.id}`} className="btn flex-1 justify-start valor">{q.nome}</Link>
+            <MenuMais rotulo={`Opções do quadro ${q.nome}`} itens={[{ rotulo: 'Abrir quadro', onClick: () => nav(`/quadro/${q.id}`) }]} excluir={() => setExcluir(q)} />
+          </li>
         ))}
       </ul>
+      {excluir && <ExcluirQuadroDialogo quadro={excluir} onFechar={() => setExcluir(null)} />}
       {novo && (
         <FiltroModal titulo="Novo quadro" comNome onFechar={() => setNovo(false)} inicial={{ gaveteiros: [], pastas: [] }}
           onSalvar={(f, nome) => {
